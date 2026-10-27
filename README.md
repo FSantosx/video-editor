@@ -111,7 +111,25 @@ no celular (permita "instalar apps desconhecidos").
 
 No primeiro uso, informe a URL do Railway e a `API_KEY`.
 
-### Desenvolver
+### Gerar o APK no GitHub Codespaces
+
+O repositório tem um `.devcontainer` que instala Flutter 3.47.8 e o Android SDK.
+
+1. No GitHub: **Code → Codespaces → ⋯ → New with options**, escolha a máquina de
+   **4 núcleos / 16 GB** e clique em **Create codespace**. A primeira criação leva de 5 a 10 minutos,
+   porque instala os SDKs; acompanhe pelo terminal ou em *View creation log*.
+2. Quando o terminal mostrar "Pronto!", rode:
+   ```bash
+   cd mobile
+   flutter build apk --release
+   ```
+3. No Explorer, abra `mobile/build/app/outputs/flutter-apk/`, clique com o botão direito em
+   `app-release.apk` e escolha **Download**.
+
+Pare o codespace ao terminar (**Codespaces → Stop**), porque ele consome a cota gratuita enquanto
+estiver ligado. O emulador Android não roda no Codespaces: teste instalando o APK no celular.
+
+### Desenvolver localmente
 
 Requer Flutter 3.47+ e Android SDK.
 

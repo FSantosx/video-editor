@@ -1,0 +1,24 @@
+{
+  "name": "Video Editor (Flutter + Android)",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": { "version": "17", "jdkDistro": "tem" },
+    "ghcr.io/devcontainers/features/python:1": { "version": "3.12" }
+  },
+  // O Gradle usa até 8 GB (android/gradle.properties): máquina de 4 núcleos / 16 GB
+  "hostRequirements": { "cpus": 4, "memory": "16gb", "storage": "32gb" },
+  "containerEnv": {
+    "FLUTTER_HOME": "/home/vscode/sdk/flutter",
+    "ANDROID_HOME": "/home/vscode/sdk/android",
+    "ANDROID_SDK_ROOT": "/home/vscode/sdk/android"
+  },
+  "remoteEnv": {
+    "PATH": "/home/vscode/sdk/flutter/bin:/home/vscode/sdk/android/cmdline-tools/latest/bin:/home/vscode/sdk/android/platform-tools:${containerEnv:PATH}"
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": ["Dart-Code.flutter", "Dart-Code.dart-code", "ms-python.python"]
+    }
+  }
+}
