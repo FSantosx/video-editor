@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video Editor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">✂</span>
+      <h1>Video Editor <small>cortes automáticos</small></h1>
+    </div>
+    <div id="system" class="chips" aria-label="Configuração do sistema"></div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <label id="dropzone" class="dropzone" tabindex="0">
+        <input id="file-input" type="file" accept="video/*" multiple hidden>
+        <strong>Arraste vídeos aqui</strong>
+        <span>ou clique para escolher (MP4, MOV, MKV, WEBM)</span>
+      </label>
+      <div id="uploads"></div>
+      <h2 class="section-title">Vídeos</h2>
+      <ul id="video-list" class="video-list" aria-live="polite"></ul>
+    </aside>
+
+    <section id="detail" class="detail" aria-live="polite">
+      <div class="empty">
+        <p>Envie um vídeo longo com alguém falando.</p>
+        <p class="muted">Ele é transcrito, os melhores trechos viram cortes em <b>9:16</b> e <b>1:1</b>,
+          com legendas e o rosto enquadrado.</p>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="editor" class="editor" aria-labelledby="editor-title">
+    <form method="dialog" id="editor-form">
+      <header class="editor-head">
+        <h2 id="editor-title">Editar corte</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Fechar">✕</button>
+      </header>
+      <div class="editor-body">
+        <div class="players" id="editor-players"></div>
+        <div class="fields">
+          <label>Título
+            <input id="f-title" maxlength="120" required>
+          </label>
+
+          <fieldset>
+            <legend>Trecho do vídeo original</legend>
+            <div class="range-row">
+              <span>Início</span>
+              <input type="range" id="f-start" step="0.1">
+              <output id="o-start"></output>
+            </div>
+            <div class="range-row">
+              <span>Fim</span>
+              <input type="range" id="f-end" step="0.1">
+              <output id="o-end"></output>
+            </div>
+            <p class="muted small" id="o-length"></p>
+          </fieldset>
+
+          <label class="check"><input type="checkbox" id="f-captions"> Legendas animadas</label>
+          <label class="check"><input type="checkbox" id="f-title-overlay"> Título nos primeiros segundos</label>
+
+          <fieldset id="reframe-box">
+            <legend>Enquadramento</legend>
+            <label class="check"><input type="checkbox" id="f-auto"> Automático (segue o rosto)</label>
+            <div class="range-row" id="crop-row">
+              <span>Esq.</span>
+              <input type="range" id="f-crop" min="0" max="1" step="0.01" aria-label="Posição do recorte">
+              <span>Dir.</span>
+            </div>
+          </fieldset>
+
+          <label class="check"><input type="checkbox" id="f-sync" checked> Aplicar a todos os formatos deste corte</label>
+
+          <div class="actions">
+            <button type="button" class="btn ghost" data-close>Cancelar</button>
+            <button type="submit" class="btn primary" id="f-save">Salvar e gerar de novo</button>
+          </div>
+          <details class="transcript">
+            <summary>Transcrição do trecho</summary>
+            <p id="f-text"></p>
+          </details>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

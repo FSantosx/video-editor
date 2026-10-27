@@ -4,7 +4,8 @@ Este JSON é a fonte da verdade: o app edita ele (título, início/fim,
 legendas...) e o render só lê ele. Formato:
 
 {
-  "id": 1, "title": "...", "score": 87, "text": "...",
+  "id": 1, "group": 1, "format": "9:16",
+  "title": "...", "score": 87, "text": "...",
   "window": {"start": 312.4, "end": 355.6},     # trecho no vídeo original
   "clips": [{"in": 312.4, "out": 318.9}, ...],  # pedaços mantidos (pausas removidas)
   "duration": 41.3,                              # duração final
@@ -72,7 +73,8 @@ def clips_duration(clips: list[dict]) -> float:
     return round(sum(c["out"] - c["in"] for c in clips), 3)
 
 
-def build_short(idx: int, candidate: dict, words: list[dict]) -> dict:
+def build_short(idx: int, candidate: dict, words: list[dict], fmt: str = "9:16",
+                group: int | None = None) -> dict:
     # A seleção pode ter cortado frases de bastidor do meio: só usa os segmentos mantidos
     segments = candidate.get("segments") or [candidate]
     clips = []
@@ -80,6 +82,9 @@ def build_short(idx: int, candidate: dict, words: list[dict]) -> dict:
         clips += build_clips(words_in(words, seg["start"], seg["end"]))
     return {
         "id": idx,
+        # mesmo trecho em formatos diferentes (9:16, 1:1) compartilha o group
+        "group": group if group is not None else idx,
+        "format": fmt,
         "title": candidate["title"],
         "score": candidate["score"],
         "text": candidate["text"],

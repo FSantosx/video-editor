@@ -16,6 +16,9 @@ Funcionando em produção:
 - **CI** (`.github/workflows/`): testes do backend e build Docker; testes do app e APK
   (artefato `shorts-editor-apk`); validação do devcontainer
 - **Codespaces** (`.devcontainer/`): ambiente com Flutter e Android SDK para gerar o APK
+- **Desktop Windows** (`desktop/`): mesmo backend rodando local com GPU (Whisper `large-v3-turbo`
+  em CUDA, render com NVENC), interface web em `localhost:8765`, cortes **9:16 e 1:1** por trecho
+  (ligados por `group`, editáveis juntos com `sync_group`); instalador com autoteste; CI em Windows
 
 ### Decisões tomadas
 
@@ -29,6 +32,10 @@ Funcionando em produção:
 | Áudio entregue ao Whisper como array numpy | O faster-whisper 1.2.1 chama `av.open(metadata_errors=...)`, parâmetro removido no PyAV 19 |
 | Fila de jobs em threads, estado em JSON no volume `/data` | Suficiente para um container; os jobs são retomados após restart |
 | `API_KEY` própria (não é chave do Claude) | Protege a API pública; uma eventual chave de LLM fica só no servidor |
+| Desktop reaproveita o `backend/` (sem fork) | Uma melhoria no pipeline vale para PC, servidor e app ao mesmo tempo |
+| Um short por formato, ligados por `group` | O app Android continua igual; no PC dá para editar os formatos juntos ou separados |
+| MP4 com versão no nome (`short_1_v2.mp4`) | No Windows não dá para sobrescrever um arquivo aberto no player; também evita cache velho |
+| Fallback do ffmpeg para ler frames | O OpenCV não abre caminhos acentuados no Windows (`C:\Users\Fábio`) |
 
 ### Problemas já resolvidos
 

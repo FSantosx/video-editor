@@ -1,0 +1,123 @@
+name: desktop
+
+# Valida a versão para Windows num Windows de verdade (sem GPU: testa o caminho da CPU)
+on:
+  push:
+    paths: ["desktop/**", "backend/**", ".github/workflows/desktop.yml"]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: powershell   # Windows PowerShell 5.1, o mesmo que vem no PC
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar (install.ps1)
+        run: |
+          & .\desktop\scripts\install.ps1 -SkipModel -NoShortcut
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Configuração de teste (modelo tiny, inglês, pasta com acento)
+        run: |
+          . .\desktop\scripts\common.ps1
+          Set-ConfigValue "WHISPER_MODEL" "tiny"
+          Set-ConfigValue "WHISPER_LANGUAGE" "en"
+          Set-ConfigValue "OPEN_BROWSER" "0"
+          Set-ConfigValue "MAX_SHORTS" "1"
+          Set-ConfigValue "DATA_DIR" "$env:RUNNER_TEMP\dados-edição"
+          Get-Content $ConfigFile
+
+      - name: Autoteste
+        run: |
+          . .\desktop\scripts\common.ps1
+          Set-AppEnvironment | Out-Null
+          & $VenvPython .\desktop\scripts\selftest.py
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Testes do backend no Windows
+        run: |
+          . .\desktop\scripts\common.ps1
+          Set-AppEnvironment | Out-Null
+          & $VenvPython -m pip install pytest httpx --quiet
+          Push-Location backend
+          & $VenvPython -m pytest -q
+          $code = $LASTEXITCODE
+          Pop-Location
+          exit $code
+
+      - name: Ponta a ponta (start.ps1 + upload + cortes 9:16 e 1:1)
+        run: |
+          . .\desktop\scripts\common.ps1
+          $cfg = Set-AppEnvironment
+          $work = Join-Path $env:RUNNER_TEMP "e2e"
+          New-Item -ItemType Directory -Force $work | Out-Null
+
+          # ~100s de fala com o sintetizador do Windows
+          Add-Type -AssemblyName System.Speech
+          $tts = New-Object System.Speech.Synthesis.SpeechSynthesizer
+          $wav = Join-Path $work "fala.wav"
+          $tts.SetOutputToWaveFile($wav)
+          $text = @(
+            "Did you know that the biggest mistake people make with money is not tracking it?",
+            "Nobody can improve what they do not measure.",
+            "I learned this the hard way, losing ten thousand dollars in one year!",
+            "The secret is simple: write down every expense for thirty days.",
+            "At the end of the month you will see exactly where your money goes.",
+            "And the result completely changed my financial life!",
+            "This is the most important tip of the whole video."
+          ) * 3 -join " "
+          $tts.Speak($text)
+          $tts.Dispose()
+          $video = Join-Path $work "palestra.mp4"
+          ffmpeg -y -v error -f lavfi -i "testsrc2=s=1280x720:r=30" -i $wav -shortest `
+            -c:v libx264 -preset ultrafast -c:a aac $video
+          if ($LASTEXITCODE) { throw "falha ao gerar o vídeo" }
+
+          $server = Start-Process powershell -PassThru -WindowStyle Hidden `
+            -RedirectStandardOutput "$work\server.out" -RedirectStandardError "$work\server.err" `
+            -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".\desktop\scripts\start.ps1"
+          $base = "http://127.0.0.1:$($cfg['PORT'])"
+          $up = $false
+          for ($i = 0; $i -lt 120; $i++) {
+            try { Invoke-WebRequest "$base/health" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop | Out-Null; $up = $true; break } catch { Start-Sleep 1 }
+          }
+          if (-not $up) { Get-Content "$work\server.err"; throw "servidor não subiu" }
+          (Invoke-WebRequest "$base/" -UseBasicParsing).Content.Substring(0, 60)
+          Invoke-RestMethod "$base/system" | ConvertTo-Json
+
+          $resp = curl.exe -s -F "file=@$video" "$base/videos" | ConvertFrom-Json
+          $vid = $resp.id
+          Write-Host "vídeo $vid enviado"
+          $done = $false
+          for ($i = 0; $i -lt 300; $i++) {
+            $v = Invoke-RestMethod "$base/videos/$vid"
+            if ($v.status -eq "error") { Get-Content "$work\server.err" -Tail 40; throw "análise falhou: $($v.error)" }
+            $pending = @($v.shorts | Where-Object { $_.render.status -ne "done" })
+            if ($v.status -eq "ready" -and $v.shorts.Count -gt 0 -and $pending.Count -eq 0) { $done = $true; break }
+            if (@($v.shorts | Where-Object { $_.render.status -eq "error" }).Count) {
+              $v.shorts | ConvertTo-Json -Depth 6; throw "render falhou"
+            }
+            Start-Sleep 3
+          }
+          if (-not $done) { $v | ConvertTo-Json -Depth 6; Get-Content "$work\server.err" -Tail 40; throw "timeout" }
+
+          $formats = @($v.shorts | ForEach-Object { $_.format })
+          Write-Host "Cortes: $($formats -join ', ')"
+          if (-not ($formats -contains "9:16" -and $formats -contains "1:1")) { throw "faltou formato" }
+          foreach ($s in $v.shorts) {
+            $file = Join-Path $env:DATA_DIR "videos\$vid\shorts\$($s.render.file)"
+            $dims = ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 $file
+            Write-Host "$($s.format): $dims ($($s.reframe.mode))"
+            $expected = if ($s.format -eq "9:16") { "1080,1920" } else { "1080,1080" }
+            if ($dims.Trim() -ne $expected) { throw "dimensão errada: $dims" }
+          }
+          Stop-Process -Id $server.Id -Force
+          Get-Content "$work\server.err" -Tail 15

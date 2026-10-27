@@ -78,7 +78,8 @@ def test_full_flow(client):
     v = wait(client, vid, lambda v: v["shorts"][0]["render"]["status"] == "done"
              and v["shorts"][0]["render"]["version"] == 2)
     s = v["shorts"][0]
-    assert s["title"] == "Novo" and s["reframe"] == {"mode": "crop", "centers": [0.3] * len(s["clips"])}
+    assert s["title"] == "Novo"
+    assert s["reframe"] == {"mode": "crop", "centers": [0.3] * len(s["clips"]), "manual": True}
 
     assert client.patch(f"/videos/{vid}/shorts/1", json={"start": 30, "end": 10}).status_code == 422
     assert client.delete(f"/videos/{vid}").status_code == 204

@@ -33,6 +33,7 @@ o app edita o JSON (título, início/fim, legendas, enquadramento) e o servidor 
 |---|---|
 | `backend/` | API FastAPI, pipeline de vídeo, Dockerfile e `railway.json` |
 | `mobile/` | App Flutter (Android, com iOS de brinde) |
+| `desktop/` | Versão para rodar no PC com Windows e GPU NVIDIA, com interface no navegador e cortes 9:16 + 1:1. Veja o [desktop/README.md](desktop/README.md) |
 | `.github/workflows/` | Testes do backend e build do APK a cada push |
 
 ---

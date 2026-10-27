@@ -20,3 +20,10 @@ mobile/android/key.properties
 mobile/ios/Pods/
 *.iml
 .idea/
+
+# desktop (instalação local no Windows)
+desktop/.venv/
+desktop/tools/
+desktop/models/
+desktop/data/
+desktop/config.env

@@ -86,15 +86,24 @@ def analyze_video(vid: str) -> None:
     _progress(vid, "select")
     words = analysis["words"]
     candidates = select_shorts(words, analysis["energy"])
-    shorts = [build_short(i + 1, c, words) for i, c in enumerate(candidates)]
+    # Um short por formato para cada trecho; o group liga as versões do mesmo trecho
+    shorts, next_id = [], 1
+    for group, cand in enumerate(candidates, start=1):
+        for fmt in config.FORMATS:
+            shorts.append(build_short(next_id, cand, words, fmt=fmt, group=group))
+            next_id += 1
     store.save_shorts(vid, shorts)
     store.update_video(vid, status="ready", step=None, progress=1.0,
                        language=analysis.get("language"),
                        analysis_seconds=round(time.time() - t0, 1))
-    log.info("vídeo %s analisado em %.1fs: %d shorts", vid, time.time() - t0, len(shorts))
+    log.info("vídeo %s analisado em %.1fs: %d trechos, %d shorts",
+             vid, time.time() - t0, len(candidates), len(shorts))
 
-    for s in shorts:
-        submit_render(vid, s["id"])
+    # Primeiro todos do formato principal, para o usuário já ter o que ver
+    for fmt in config.FORMATS:
+        for s in shorts:
+            if s["format"] == fmt:
+                submit_render(vid, s["id"])
 
 
 def render(vid: str, sid: int) -> None:
@@ -110,7 +119,8 @@ def render(vid: str, sid: int) -> None:
 
     set_status(status="rendering", progress=0.0)
     if short["reframe"]["mode"] == "auto":
-        reframe = compute_reframe(src, short["clips"], meta["width"], meta["height"])
+        reframe = _sibling_reframe(vid, short, meta) or compute_reframe(
+            src, short["clips"], meta["width"], meta["height"], target_aspect=_aspect(short))
         store.update_short(vid, sid, lambda s: s.update(reframe=reframe))
         short["reframe"] = reframe
 
@@ -121,10 +131,34 @@ def render(vid: str, sid: int) -> None:
             last[0] = f
             set_status(progress=round(f, 2))
 
-    result = render_short(src, short, meta, words, store.video_dir(vid) / "shorts", on_progress)
+    result = render_short(src, short, meta, words, store.video_dir(vid) / "shorts", on_progress,
+                          version=version + 1)
     set_status(status="done", progress=1.0, file=result["file"], thumb=result["thumb"],
                version=version + 1, seconds=round(time.time() - t0, 1))
-    log.info("short %s/%s renderizado em %.1fs", vid, sid, time.time() - t0)
+    log.info("short %s/%s (%s) renderizado em %.1fs", vid, sid, short.get("format"),
+             time.time() - t0)
+
+
+def _aspect(short: dict) -> float:
+    w, h = config.FORMAT_SIZES[short.get("format", "9:16")]
+    return w / h
+
+
+def _sibling_reframe(vid: str, short: dict, meta: dict) -> dict | None:
+    """Reaproveita a detecção de rosto de outro formato do mesmo trecho (mesmos clips).
+
+    Só vale quando os dois formatos cortam nas laterais (original mais largo que
+    ambos), caso em que o centro X do rosto é o mesmo.
+    """
+    src_aspect = meta["width"] / meta["height"]
+    if src_aspect <= _aspect(short):
+        return None
+    for other in store.get_shorts(vid):
+        if (other["id"] != short["id"] and other.get("group") == short.get("group")
+                and other["clips"] == short["clips"] and src_aspect > _aspect(other)
+                and other["reframe"]["mode"] in ("crop", "blur")):
+            return {"mode": other["reframe"]["mode"], "centers": list(other["reframe"]["centers"])}
+    return None
 
 
 def resume_pending() -> None:

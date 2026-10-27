@@ -7,16 +7,22 @@ Fluxo:
   GET   /videos/{id}/shorts/{n}/video   MP4 final (aceita Range, dá para tocar em streaming)
 """
 import logging
+import os
 import secrets
 import shutil
+import subprocess
+import sys
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import config, jobs, store
+from .pipeline import render, transcribe
 from .pipeline.edit import apply_window
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -27,6 +33,10 @@ ALLOWED_EXT = {".mp4", ".mov", ".m4v", ".mkv", ".webm"}
 async def lifespan(_app: FastAPI):
     config.VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
     jobs.resume_pending()
+    if config.DESKTOP_MODE and config.TRANSCRIBER == "whisper":
+        # Carrega o modelo em segundo plano: a 1ª análise não espera e a interface já
+        # mostra se ficou na GPU ou na CPU
+        threading.Thread(target=transcribe._whisper_model, daemon=True).start()
     yield
 
 
@@ -127,6 +137,8 @@ class ShortPatch(BaseModel):
     # centro horizontal do recorte (0-1) para todos os clips; null volta ao automático
     crop_center: float | None = Field(None, ge=0, le=1)
     auto_reframe: bool | None = None
+    # aplica também aos outros formatos do mesmo trecho (ex.: o 1:1 do mesmo 9:16)
+    sync_group: bool = False
 
 
 @app.patch("/videos/{vid}/shorts/{sid}", dependencies=[Depends(require_key)])
@@ -155,14 +167,24 @@ def patch_short(vid: str, sid: int, patch: ShortPatch):
             s["captions"]["enabled"] = patch.captions
         if patch.title_overlay is not None:
             s["title_overlay"]["enabled"] = patch.title_overlay
+        target_w, target_h = config.FORMAT_SIZES[s.get("format", "9:16")]
         if patch.auto_reframe:
             s["reframe"] = {"mode": "auto", "centers": []}
-        elif patch.crop_center is not None and meta["width"] / meta["height"] > 9 / 16:
-            s["reframe"] = {"mode": "crop", "centers": [patch.crop_center] * len(s["clips"])}
+        elif (patch.crop_center is not None
+              and meta["width"] / meta["height"] > target_w / target_h):
+            s["reframe"] = {"mode": "crop", "centers": [patch.crop_center] * len(s["clips"]),
+                            "manual": True}
         s["render"]["status"] = "pending"
 
-    store.update_short(vid, sid, mutate)
-    jobs.submit_render(vid, sid)
+    targets = [sid]
+    if patch.sync_group:
+        group = short.get("group", sid)
+        targets += [s["id"] for s in store.get_shorts(vid)
+                    if s.get("group", s["id"]) == group and s["id"] != sid]
+    for target in targets:
+        store.update_short(vid, target, mutate)
+    for target in targets:
+        jobs.submit_render(vid, target)
     return store.get_short(vid, sid)
 
 
@@ -179,8 +201,10 @@ def _short_file(vid: str, sid: int, key: str, media_type: str) -> FileResponse:
     path = store.video_dir(vid) / "shorts" / name if name else None
     if path is None or not path.exists():
         raise HTTPException(404, "ainda não renderizado")
-    return FileResponse(path, media_type=media_type,
-                        filename=f"short_{sid}{path.suffix}" if key == "file" else None)
+    filename = None
+    if key == "file":  # ex.: corte_2_9x16.mp4
+        filename = f"corte_{short.get('group', sid)}_{short.get('format', '9:16').replace(':', 'x')}.mp4"
+    return FileResponse(path, media_type=media_type, filename=filename)
 
 
 @app.get("/videos/{vid}/shorts/{sid}/video", dependencies=[Depends(require_key)])
@@ -199,3 +223,36 @@ def stats():
     return {"videos": len(store.list_videos()),
             "disk_free_gb": round(usage.free / 1e9, 2),
             "whisper_model": config.WHISPER_MODEL}
+
+
+@app.get("/system", dependencies=[Depends(require_key)])
+def system():
+    """Configuração efetiva (mostrada na interface desktop)."""
+    loaded = transcribe._whisper_model.cache_info().currsize > 0
+    return {
+        "desktop": config.DESKTOP_MODE,
+        "formats": config.FORMATS,
+        "whisper_model": config.WHISPER_MODEL,
+        "whisper_device": transcribe.describe_device() if loaded else config.WHISPER_DEVICE,
+        "video_encoder": render.video_encoder(),
+        "data_dir": str(config.DATA_DIR),
+        "disk_free_gb": round(shutil.disk_usage(config.DATA_DIR).free / 1e9, 1),
+    }
+
+
+@app.post("/videos/{vid}/open-folder", status_code=204, dependencies=[Depends(require_key)])
+def open_folder(vid: str):
+    """Só no modo desktop: abre a pasta dos shorts no Explorer."""
+    if not config.DESKTOP_MODE:
+        raise HTTPException(404)
+    _video_or_404(vid)
+    folder = store.video_dir(vid) / "shorts"
+    if sys.platform == "win32":
+        os.startfile(folder)  # noqa: S606 - caminho controlado pelo servidor
+    else:
+        subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(folder)])
+
+
+# Interface web local (desktop/web): registrada por último para não encobrir a API
+if config.DESKTOP_MODE and config.WEB_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=config.WEB_DIR, html=True), name="web")

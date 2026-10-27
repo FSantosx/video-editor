@@ -12,7 +12,7 @@ class FFmpegError(RuntimeError):
 
 
 def run(cmd: list[str]) -> subprocess.CompletedProcess:
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if proc.returncode != 0:
         raise FFmpegError(f"{cmd[0]} falhou ({proc.returncode}):\n{proc.stderr[-2000:]}")
     return proc
@@ -61,7 +61,7 @@ def detect_silences(wav: Path, noise_db: float = -35, min_dur: float = 0.3) -> l
     proc = subprocess.run(
         ["ffmpeg", "-hide_banner", "-i", str(wav), "-af",
          f"silencedetect=noise={noise_db}dB:d={min_dur}", "-f", "null", "-"],
-        capture_output=True, text=True)
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
     silences, start = [], None
     for line in proc.stderr.splitlines():
         if m := re.search(r"silence_start: ([\d.]+)", line):

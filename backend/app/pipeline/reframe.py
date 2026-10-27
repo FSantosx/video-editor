@@ -1,14 +1,15 @@
-"""Reenquadramento 16:9 -> 9:16.
+"""Reenquadramento para a proporção de saída (9:16, 1:1).
 
 Para cada clip, amostra alguns frames, detecta rostos e guarda o centro X
 (0 a 1) do rosto principal. Um centro fixo por clip mantém a imagem estável
 e a troca acontece no corte seco, que já existe por causa das pausas.
 
 Modos resultantes:
-  "fit"  - vídeo já é vertical: só escala
-  "crop" - recorte vertical seguindo o rosto
+  "fit"  - vídeo já está na proporção de saída: só escala
+  "crop" - recorte seguindo o rosto (ou vertical, se o original for mais alto que a saída)
   "blur" - nenhum rosto achado: vídeo inteiro centralizado sobre fundo desfocado
 """
+import subprocess
 from pathlib import Path
 
 import cv2
@@ -38,11 +39,16 @@ def _face_center(frame, detector) -> float | None:
     return float((x + fw / 2) / small.shape[1])
 
 
-def compute_reframe(source: Path, clips: list[dict], width: int, height: int) -> dict:
-    if width / height <= 9 / 16 + 0.01:
-        return {"mode": "fit", "centers": []}
+def compute_reframe(source: Path, clips: list[dict], width: int, height: int,
+                    target_aspect: float = 9 / 16) -> dict:
+    src_aspect = width / height
+    if abs(src_aspect - target_aspect) / target_aspect < 0.02:
+        return {"mode": "fit", "centers": []}  # já está na proporção certa
+    if src_aspect < target_aspect:
+        # Original mais "em pé" que a saída (ex.: celular -> 1:1): recorte vertical, sem rosto
+        return {"mode": "crop", "centers": [0.5] * len(clips)}
 
-    cap = cv2.VideoCapture(str(source))
+    read_frame, close = _frame_reader(source, width, height)
     detector = _detector()
     centers: list[float | None] = []
     try:
@@ -51,13 +57,12 @@ def compute_reframe(source: Path, clips: list[dict], width: int, height: int) ->
             n = int(np.clip(round(dur * SAMPLES_PER_SECOND), 1, MAX_SAMPLES_PER_CLIP))
             found = []
             for t in np.linspace(c["in"], c["out"], n + 2)[1:-1]:
-                cap.set(cv2.CAP_PROP_POS_MSEC, float(t) * 1000)
-                ok, frame = cap.read()
-                if ok and (cx := _face_center(frame, detector)) is not None:
+                frame = read_frame(float(t))
+                if frame is not None and (cx := _face_center(frame, detector)) is not None:
                     found.append(cx)
             centers.append(float(np.median(found)) if found else None)
     finally:
-        cap.release()
+        close()
 
     known = [c for c in centers if c is not None]
     if not known:
@@ -68,3 +73,31 @@ def compute_reframe(source: Path, clips: list[dict], width: int, height: int) ->
         last = c if c is not None else last
         filled.append(round(last, 4))
     return {"mode": "crop", "centers": filled}
+
+
+def _frame_reader(source: Path, width: int, height: int):
+    """Lê um frame no tempo t (s). Usa o OpenCV; se ele não abrir o arquivo
+    (no Windows isso acontece com caminhos acentuados, ex. C:\\Users\\Fábio),
+    extrai o frame com o ffmpeg, que lida com qualquer caminho."""
+    cap = cv2.VideoCapture(str(source))
+    if cap.isOpened():
+        def read_cv(t: float):
+            cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000)
+            ok, frame = cap.read()
+            return frame if ok else None
+        return read_cv, cap.release
+
+    cap.release()
+    w = min(width, DETECT_WIDTH) // 2 * 2
+    h = int(round(height * w / width)) // 2 * 2
+
+    def read_ffmpeg(t: float):
+        proc = subprocess.run(
+            ["ffmpeg", "-v", "error", "-ss", f"{t:.3f}", "-i", str(source), "-frames:v", "1",
+             "-vf", f"scale={w}:{h}", "-f", "rawvideo", "-pix_fmt", "bgr24", "pipe:1"],
+            capture_output=True)
+        if proc.returncode != 0 or len(proc.stdout) != w * h * 3:
+            return None
+        return np.frombuffer(proc.stdout, dtype=np.uint8).reshape(h, w, 3)
+
+    return read_ffmpeg, lambda: None

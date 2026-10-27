@@ -47,8 +47,13 @@ def _chunks(words: list[dict]) -> list[list[dict]]:
 
 
 def build_ass(words: list[dict], title: str | None, title_seconds: float,
-              captions: bool = True) -> str:
-    W, H = config.OUT_W, config.OUT_H
+              captions: bool = True, size: tuple[int, int] = (1080, 1920)) -> str:
+    W, H = size
+    vertical = H > W
+    # Legenda no terço de baixo, acima da interface do app (Reels/TikTok) no 9:16
+    caption_margin = int(H * (0.29 if vertical else 0.14))
+    title_margin = int(H * (0.12 if vertical else 0.06))
+    caption_size = 86 if vertical else 72
     font = config.CAPTION_FONT
     lines = [
         "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {W}", f"PlayResY: {H}",
@@ -57,10 +62,10 @@ def build_ass(words: list[dict], title: str | None, title_seconds: float,
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
         "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "
         "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-        f"Style: Caption,{font},86,{WHITE},{WHITE},{BLACK},{BLACK},-1,0,0,0,100,100,0,0,"
-        f"1,7,3,2,60,60,560,1",
+        f"Style: Caption,{font},{caption_size},{WHITE},{WHITE},{BLACK},{BLACK},-1,0,0,0,100,100,0,0,"
+        f"1,7,3,2,60,60,{caption_margin},1",
         f"Style: Title,{font},62,{WHITE},{WHITE},{TITLE_BG},{TITLE_BG},-1,0,0,0,100,100,0,0,"
-        f"3,18,0,8,80,80,230,1",
+        f"3,18,0,8,80,80,{title_margin},1",
         "", "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
