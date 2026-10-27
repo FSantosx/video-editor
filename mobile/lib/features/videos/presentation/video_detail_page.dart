@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/l10n.dart';
 import '../../../core/providers.dart';
+import '../../../core/result.dart';
 import '../../../core/widgets/error_view.dart';
 import '../domain/models.dart';
 import 'widgets/short_card.dart';
@@ -39,6 +40,15 @@ class _Body extends ConsumerWidget {
 
   final Video video;
 
+  Future<void> _reanalyze(BuildContext context, WidgetRef ref) async {
+    final result = await ref.read(videosRepositoryProvider)!.reanalyze(video.id);
+    if (!context.mounted) return;
+    if (result case Err(:final failure)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(failure.message(context.l10n))));
+    }
+    ref.invalidate(videoDetailProvider(video.id)); // volta a acompanhar o progresso
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
@@ -46,7 +56,17 @@ class _Body extends ConsumerWidget {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text('${l10n.statusError}\n${video.error ?? ''}', textAlign: TextAlign.center),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('${l10n.statusError}\n${video.error ?? ''}', textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton.tonal(
+                onPressed: () => _reanalyze(context, ref),
+                child: Text(l10n.retry),
+              ),
+            ],
+          ),
         ),
       );
     }

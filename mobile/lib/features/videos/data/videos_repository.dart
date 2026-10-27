@@ -42,6 +42,12 @@ class VideosRepository {
         return Video.fromJson(r.data!);
       });
 
+  /// Reprocessa um vídeo que falhou, sem precisar enviar o arquivo de novo.
+  Future<Result<Video>> reanalyze(String id) => _api.call((dio) async {
+        final r = await dio.post<Map<String, dynamic>>('/videos/$id/reanalyze');
+        return Video.fromJson(r.data!);
+      });
+
   Future<Result<void>> delete(String id) => _api.call((dio) => dio.delete<void>('/videos/$id'));
 
   Future<Result<Short>> patchShort(String videoId, int shortId, ShortPatch patch) =>

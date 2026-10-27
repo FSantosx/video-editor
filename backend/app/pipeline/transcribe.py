@@ -5,8 +5,11 @@ Saída padronizada (independente do motor):
 """
 import json
 import os
+import wave
 from functools import lru_cache
 from pathlib import Path
+
+import numpy as np
 
 from .. import config
 
@@ -18,12 +21,26 @@ def _whisper_model():
     return WhisperModel(config.WHISPER_MODEL, device="cpu", compute_type=config.WHISPER_COMPUTE)
 
 
+def load_wav(wav: Path) -> np.ndarray:
+    """Lê o WAV 16 kHz mono (gerado pelo ffmpeg) como float32 em [-1, 1].
+
+    Passar o array evita que o faster-whisper abra o arquivo com PyAV: o
+    faster-whisper 1.2.1 chama av.open(metadata_errors=...), parâmetro que o
+    PyAV removeu, o que quebrava a transcrição.
+    """
+    with wave.open(str(wav), "rb") as w:
+        if w.getframerate() != 16000 or w.getnchannels() != 1 or w.getsampwidth() != 2:
+            raise ValueError("WAV precisa ser 16 kHz, mono, 16 bits")
+        pcm = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16)
+    return pcm.astype(np.float32) / 32768.0
+
+
 def transcribe(wav: Path, source: Path, on_progress=None) -> tuple[list[dict], str | None]:
     if config.TRANSCRIBER == "sidecar":
         return _sidecar(source), config.WHISPER_LANGUAGE
 
     segments, info = _whisper_model().transcribe(
-        str(wav),
+        load_wav(wav),
         language=config.WHISPER_LANGUAGE,
         word_timestamps=True,
         vad_filter=True,
