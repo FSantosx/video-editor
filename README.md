@@ -151,6 +151,8 @@ Para publicar na Play Store, crie uma chave de release e configure `signingConfi
 
 ## Limitações conhecidas e próximos passos
 
+O plano detalhado de evolução, com as decisões já tomadas, está em **[ROADMAP.md](ROADMAP.md)**.
+
 - **Seleção por heurística:** usa ritmo de fala, energia do áudio, palavras de gancho e frases
   completas, e corta frases de bastidor ("bom, deixa eu ajustar a câmera"). Funciona, mas não
   entende o conteúdo. O próximo passo é um seletor com LLM, que é só trocar a função
