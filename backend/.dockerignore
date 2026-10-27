@@ -1,0 +1,7 @@
+data/
+tests/
+tools/
+**/__pycache__/
+*.mp4
+*.words.json
+.venv/

@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest
+httpx==0.28.1
+# só para tools/make_test_video.py (foto de exemplo com rosto)
+scikit-image

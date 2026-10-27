@@ -1,0 +1,36 @@
+name: mobile
+
+on:
+  push:
+    paths: ["mobile/**", ".github/workflows/mobile.yml"]
+  pull_request:
+    paths: ["mobile/**", ".github/workflows/mobile.yml"]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.8"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      # APK assinado com a chave de debug: serve para instalar direto no celular.
+      # Para publicar na Play Store, configure uma chave de release (ver README).
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shorts-editor-apk
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk

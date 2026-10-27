@@ -1,0 +1,106 @@
+{
+ "id": "691dc252b1b7",
+ "filename": "test.mp4",
+ "created_at": 1793115294.0039842,
+ "status": "ready",
+ "step": null,
+ "progress": 1.0,
+ "error": null,
+ "meta": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30.0,
+  "duration": 101.455011,
+  "video_codec": "h264",
+  "audio_codec": "aac"
+ },
+ "language": "pt",
+ "size_bytes": 3148368,
+ "analysis_seconds": 0.5,
+ "shorts": [
+  {
+   "id": 1,
+   "title": "Como sair das dívidas",
+   "score": 100,
+   "text": "Por que a maioria das pessoas nunca consegue sair das dívidas? Porque elas tentam pagar tudo ao mesmo tempo. O jeito certo é atacar primeiro a dívida com os juros mais altos. Cartão de crédito e cheque especial cobram mais de dez por cento ao mês! Imagina pagar isso durante um ano inteiro. Cuidado com essa armadilha, ela é a verdade que ninguém te conta. Quite essas primeiro e depois cuide do resto. Bom, era isso que eu tinha para hoje. Se gostou, deixa o seu comentário aqui embaixo. Até o próximo vídeo, tchau tchau.",
+   "window": {
+    "start": 66.0,
+    "end": 100.5
+   },
+   "clips": [
+    {
+     "in": 65.921,
+     "out": 69.251
+    },
+    {
+     "in": 69.631,
+     "out": 72.502
+    },
+    {
+     "in": 72.782,
+     "out": 76.631
+    },
+    {
+     "in": 76.911,
+     "out": 80.85
+    },
+    {
+     "in": 81.23,
+     "out": 83.933
+    },
+    {
+     "in": 84.213,
+     "out": 88.132
+    },
+    {
+     "in": 88.512,
+     "out": 90.903
+    },
+    {
+     "in": 92.383,
+     "out": 94.701
+    },
+    {
+     "in": 95.081,
+     "out": 98.091
+    },
+    {
+     "in": 98.471,
+     "out": 100.515
+    }
+   ],
+   "duration": 30.374,
+   "reframe": {
+    "mode": "crop",
+    "centers": [
+     0.5,
+     0.5,
+     0.5,
+     0.5,
+     0.5,
+     0.5,
+     0.5,
+     0.5,
+     0.5,
+     0.5
+    ]
+   },
+   "captions": {
+    "enabled": true
+   },
+   "title_overlay": {
+    "enabled": true,
+    "seconds": 3.0
+   },
+   "render": {
+    "status": "done",
+    "file": "short_1.mp4",
+    "error": null,
+    "version": 2,
+    "progress": 1.0,
+    "thumb": "short_1.jpg",
+    "seconds": 16.0
+   }
+  }
+ ]
+}

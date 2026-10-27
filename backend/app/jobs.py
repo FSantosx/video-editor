@@ -1,0 +1,140 @@
+"""Fila de processamento em threads (suficiente para um único container no Railway).
+
+analyze_video: áudio -> transcrição -> silêncios/energia -> seleção -> JSON dos shorts
+               e já enfileira o render de cada short.
+render:        gera o MP4 de um short a partir do JSON de edição.
+"""
+import logging
+import time
+import traceback
+from concurrent.futures import ThreadPoolExecutor
+
+from . import config, store
+from .pipeline import media
+from .pipeline.edit import build_short
+from .pipeline.reframe import compute_reframe
+from .pipeline.render import render_short
+from .pipeline.select import select_shorts
+from .pipeline.transcribe import transcribe
+
+log = logging.getLogger("jobs")
+_pool = ThreadPoolExecutor(max_workers=config.WORKERS, thread_name_prefix="job")
+
+# Peso de cada etapa no progresso total da análise
+STEPS = {"probe": (0.0, 0.02), "audio": (0.02, 0.08), "transcribe": (0.08, 0.85),
+         "analyze": (0.85, 0.92), "select": (0.92, 1.0)}
+
+
+def _progress(vid: str, step: str, frac: float = 0.0) -> None:
+    lo, hi = STEPS[step]
+    store.update_video(vid, step=step, progress=round(lo + (hi - lo) * frac, 3))
+
+
+def submit_analysis(vid: str) -> None:
+    store.update_video(vid, status="queued", step=None, progress=0.0, error=None)
+    _pool.submit(_safe, analyze_video, vid)
+
+
+def submit_render(vid: str, sid: int) -> None:
+    def mark(s):
+        s["render"].update(status="queued", error=None, progress=0.0)
+    store.update_short(vid, sid, mark)
+    _pool.submit(_safe, render, vid, sid)
+
+
+def _safe(fn, *args):
+    try:
+        fn(*args)
+    except Exception as exc:  # o job nunca derruba o servidor
+        log.error("job %s%s falhou\n%s", fn.__name__, args, traceback.format_exc())
+        vid = args[0]
+        try:
+            if fn is analyze_video:
+                store.update_video(vid, status="error", error=str(exc)[-500:])
+            else:
+                store.update_short(vid, args[1], lambda s: s["render"].update(
+                    status="error", error=str(exc)[-500:]))
+        except KeyError:
+            pass  # vídeo apagado no meio do processamento
+
+
+def analyze_video(vid: str) -> None:
+    t0 = time.time()
+    store.update_video(vid, status="analyzing")
+    src = store.source_path(vid)
+    d = store.video_dir(vid)
+
+    _progress(vid, "probe")
+    meta = media.probe(src)
+    store.update_video(vid, meta=meta)
+
+    analysis = store.get_analysis(vid)
+    if analysis is None:  # cache: reanalisar não transcreve de novo
+        _progress(vid, "audio")
+        wav = media.extract_audio(src, d / "audio.wav")
+
+        _progress(vid, "transcribe")
+        words, language = transcribe(wav, src, lambda f: _progress(vid, "transcribe", f))
+
+        _progress(vid, "analyze")
+        analysis = {"words": words, "language": language,
+                    "silences": media.detect_silences(wav),
+                    "energy": media.audio_energy(wav)}
+        store.save_analysis(vid, analysis)
+        wav.unlink(missing_ok=True)
+
+    _progress(vid, "select")
+    words = analysis["words"]
+    candidates = select_shorts(words, analysis["energy"])
+    shorts = [build_short(i + 1, c, words) for i, c in enumerate(candidates)]
+    store.save_shorts(vid, shorts)
+    store.update_video(vid, status="ready", step=None, progress=1.0,
+                       language=analysis.get("language"),
+                       analysis_seconds=round(time.time() - t0, 1))
+    log.info("vídeo %s analisado em %.1fs: %d shorts", vid, time.time() - t0, len(shorts))
+
+    for s in shorts:
+        submit_render(vid, s["id"])
+
+
+def render(vid: str, sid: int) -> None:
+    t0 = time.time()
+    src = store.source_path(vid)
+    meta = store.get_video(vid)["meta"]
+    words = store.get_analysis(vid)["words"]
+    short = store.get_short(vid, sid)
+    version = short["render"].get("version", 0)
+
+    def set_status(**kw):
+        store.update_short(vid, sid, lambda s: s["render"].update(**kw))
+
+    set_status(status="rendering", progress=0.0)
+    if short["reframe"]["mode"] == "auto":
+        reframe = compute_reframe(src, short["clips"], meta["width"], meta["height"])
+        store.update_short(vid, sid, lambda s: s.update(reframe=reframe))
+        short["reframe"] = reframe
+
+    last = [0.0]
+
+    def on_progress(f):
+        if f - last[0] >= 0.05:  # não escrever o JSON a cada frame
+            last[0] = f
+            set_status(progress=round(f, 2))
+
+    result = render_short(src, short, meta, words, store.video_dir(vid) / "shorts", on_progress)
+    set_status(status="done", progress=1.0, file=result["file"], thumb=result["thumb"],
+               version=version + 1, seconds=round(time.time() - t0, 1))
+    log.info("short %s/%s renderizado em %.1fs", vid, sid, time.time() - t0)
+
+
+def resume_pending() -> None:
+    """Depois de um restart do container, retoma o que ficou pela metade."""
+    for v in store.list_videos():
+        if v["status"] in ("queued", "analyzing"):
+            submit_analysis(v["id"])
+        elif v["status"] == "ready":
+            for s in store.get_shorts(v["id"]):
+                if s["render"]["status"] in ("pending", "queued", "rendering"):
+                    submit_render(v["id"], s["id"])
+        elif v["status"] == "uploading":
+            store.delete_video(v["id"])  # upload interrompido
