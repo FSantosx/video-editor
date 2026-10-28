@@ -74,6 +74,8 @@ class Short {
     required this.cropCenter,
     required this.captions,
     required this.titleOverlay,
+    required this.cta,
+    required this.ctaText,
     required this.render,
   });
 
@@ -81,6 +83,7 @@ class Short {
     final window = json['window'] as Map<String, dynamic>;
     final reframe = json['reframe'] as Map<String, dynamic>;
     final centers = (reframe['centers'] as List).cast<num>();
+    final cta = json['cta'] as Map<String, dynamic>?; // ausente em shorts antigos
     return Short(
       id: json['id'] as int,
       title: json['title'] as String,
@@ -94,6 +97,8 @@ class Short {
       cropCenter: centers.isEmpty ? null : centers.first.toDouble(),
       captions: (json['captions'] as Map<String, dynamic>)['enabled'] as bool,
       titleOverlay: (json['title_overlay'] as Map<String, dynamic>)['enabled'] as bool,
+      cta: cta?['enabled'] as bool? ?? false,
+      ctaText: cta?['text'] as String? ?? '',
       render: ShortRender.fromJson(json['render'] as Map<String, dynamic>),
     );
   }
@@ -110,6 +115,10 @@ class Short {
   final double? cropCenter;
   final bool captions;
   final bool titleOverlay;
+
+  /// Chamada no final (ex.: "E você, o que acha? Comenta aí!")
+  final bool cta;
+  final String ctaText;
   final ShortRender render;
 }
 
@@ -174,6 +183,8 @@ class ShortPatch {
     this.titleOverlay,
     this.cropCenter,
     this.autoReframe,
+    this.cta,
+    this.ctaText,
   });
 
   final String? title;
@@ -183,6 +194,8 @@ class ShortPatch {
   final bool? titleOverlay;
   final double? cropCenter;
   final bool? autoReframe;
+  final bool? cta;
+  final String? ctaText;
 
   Map<String, dynamic> toJson() => {
         if (title != null) 'title': title,
@@ -192,6 +205,8 @@ class ShortPatch {
         if (titleOverlay != null) 'title_overlay': titleOverlay,
         if (cropCenter != null) 'crop_center': cropCenter,
         if (autoReframe != null) 'auto_reframe': autoReframe,
+        if (cta != null) 'cta': cta,
+        if (ctaText != null) 'cta_text': ctaText,
       };
 
   bool get isEmpty => toJson().isEmpty;

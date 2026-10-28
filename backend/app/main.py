@@ -137,6 +137,9 @@ class ShortPatch(BaseModel):
     # centro horizontal do recorte (0-1) para todos os clips; null volta ao automático
     crop_center: float | None = Field(None, ge=0, le=1)
     auto_reframe: bool | None = None
+    # chamada no final do corte (ex.: "E você, o que acha? Comenta aí!")
+    cta: bool | None = None
+    cta_text: str | None = Field(None, max_length=80)
     # aplica também aos outros formatos do mesmo trecho (ex.: o 1:1 do mesmo 9:16)
     sync_group: bool = False
 
@@ -167,6 +170,12 @@ def patch_short(vid: str, sid: int, patch: ShortPatch):
             s["captions"]["enabled"] = patch.captions
         if patch.title_overlay is not None:
             s["title_overlay"]["enabled"] = patch.title_overlay
+        if patch.cta is not None or patch.cta_text is not None:
+            cta = s.setdefault("cta", {"enabled": config.CTA_ENABLED, "text": config.CTA_TEXT})
+            if patch.cta is not None:
+                cta["enabled"] = patch.cta
+            if patch.cta_text is not None and patch.cta_text.strip():
+                cta["text"] = patch.cta_text.strip()
         target_w, target_h = config.FORMAT_SIZES[s.get("format", "9:16")]
         if patch.auto_reframe:
             s["reframe"] = {"mode": "auto", "centers": []}

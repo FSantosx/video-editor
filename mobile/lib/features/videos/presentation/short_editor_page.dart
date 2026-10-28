@@ -57,18 +57,20 @@ class _Editor extends ConsumerStatefulWidget {
 class _EditorState extends ConsumerState<_Editor> {
   late ShortDraft _draft = ShortDraft.fromShort(widget.short);
   late final _title = TextEditingController(text: widget.short.title);
+  late final _ctaText = TextEditingController(text: widget.short.ctaText);
   bool _saving = false;
 
   @override
   void dispose() {
     _title.dispose();
+    _ctaText.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     final l10n = context.l10n;
     final messenger = ScaffoldMessenger.of(context);
-    final patch = _draft.copyWith(title: _title.text).diff(widget.short);
+    final patch = _draft.copyWith(title: _title.text, ctaText: _ctaText.text).diff(widget.short);
     if (patch.isEmpty) return;
     setState(() => _saving = true);
     final result = await ref.read(videosRepositoryProvider)!.patchShort(widget.video.id, widget.short.id, patch);
@@ -91,7 +93,7 @@ class _EditorState extends ConsumerState<_Editor> {
     final repo = ref.watch(videosRepositoryProvider)!;
     final meta = widget.video.meta;
     final bounds = windowBounds(short, meta?.duration ?? short.windowEnd);
-    final hasChanges = !_draft.copyWith(title: _title.text).diff(short).isEmpty;
+    final hasChanges = !_draft.copyWith(title: _title.text, ctaText: _ctaText.text).diff(short).isEmpty;
     final busy = short.render.isWorking;
 
     return ListView(
@@ -152,6 +154,20 @@ class _EditorState extends ConsumerState<_Editor> {
           value: _draft.titleOverlay,
           onChanged: (v) => setState(() => _draft = _draft.copyWith(titleOverlay: v)),
         ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(l10n.cta),
+          subtitle: Text(l10n.ctaHint),
+          value: _draft.cta,
+          onChanged: (v) => setState(() => _draft = _draft.copyWith(cta: v)),
+        ),
+        if (_draft.cta)
+          TextField(
+            controller: _ctaText,
+            maxLength: 80,
+            decoration: InputDecoration(labelText: l10n.ctaText, border: const OutlineInputBorder()),
+            onChanged: (_) => setState(() {}),
+          ),
         if (meta?.isHorizontal ?? false) ...[
           SwitchListTile(
             contentPadding: EdgeInsets.zero,

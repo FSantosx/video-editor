@@ -15,6 +15,8 @@ class ShortDraft {
     required this.titleOverlay,
     required this.autoReframe,
     required this.cropCenter,
+    required this.cta,
+    required this.ctaText,
   });
 
   factory ShortDraft.fromShort(Short s) => ShortDraft(
@@ -25,6 +27,8 @@ class ShortDraft {
         titleOverlay: s.titleOverlay,
         autoReframe: s.reframeMode != ReframeMode.crop || s.cropCenter == null,
         cropCenter: s.cropCenter ?? 0.5,
+        cta: s.cta,
+        ctaText: s.ctaText,
       );
 
   final String title;
@@ -34,6 +38,8 @@ class ShortDraft {
   final bool titleOverlay;
   final bool autoReframe;
   final double cropCenter;
+  final bool cta;
+  final String ctaText;
 
   ShortDraft copyWith({
     String? title,
@@ -43,6 +49,8 @@ class ShortDraft {
     bool? titleOverlay,
     bool? autoReframe,
     double? cropCenter,
+    bool? cta,
+    String? ctaText,
   }) =>
       ShortDraft(
         title: title ?? this.title,
@@ -52,6 +60,8 @@ class ShortDraft {
         titleOverlay: titleOverlay ?? this.titleOverlay,
         autoReframe: autoReframe ?? this.autoReframe,
         cropCenter: cropCenter ?? this.cropCenter,
+        cta: cta ?? this.cta,
+        ctaText: ctaText ?? this.ctaText,
       );
 
   double get length => end - start;
@@ -69,6 +79,10 @@ class ShortDraft {
       titleOverlay: titleOverlay != base.titleOverlay ? titleOverlay : null,
       autoReframe: reframeChanged && autoReframe ? true : null,
       cropCenter: reframeChanged && !autoReframe ? _round(cropCenter) : null,
+      cta: cta != base.cta ? cta : null,
+      ctaText: cta && ctaText.trim().isNotEmpty && ctaText.trim() != base.ctaText
+          ? ctaText.trim()
+          : null,
     );
   }
 

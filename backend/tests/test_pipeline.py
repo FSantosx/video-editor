@@ -62,3 +62,33 @@ def test_ass_escapes_and_highlights():
     assert ass.count("Dialogue: 0,") == 2  # uma linha por palavra destacada
     assert "OLÁX" in ass and "MUNDO" in ass
     assert "Dialogue: 1," in ass  # título
+
+
+def test_prefers_target_length_over_max():
+    """Feedback do YouTube: 55s reteve 48,8%. Com material de sobra, mirar ~38s, não 60s."""
+    script = [(f"Você sabia que o erro número {i} custa dinheiro de verdade?", 0.3) for i in range(40)]
+    shorts = select_shorts(make_words(script), energy=[], min_s=30, max_s=60, max_shorts=3,
+                           target_s=38)
+    assert shorts
+    assert all(s["speech_duration"] <= 45 for s in shorts), [s["speech_duration"] for s in shorts]
+
+
+def test_prefers_conclusive_ending_over_dangling():
+    intro = [(f"Você sabia que o erro número {i} custa caro?", 0.3) for i in range(9)]
+    conclusive = intro + [("Por isso a lição é anotar tudo!", 0.3),
+                          ("Mas aí eu fui ver outra coisa,", 0.3),
+                          ("e depois a gente conversa sobre", 1.5)]
+    shorts = select_shorts(make_words(conclusive), energy=[], min_s=10, max_s=60, max_shorts=1,
+                           target_s=20)
+    assert shorts[0]["text"].rstrip().endswith("anotar tudo!")
+
+
+def test_cta_shown_at_end_without_overlapping_title():
+    words = [{"word": "fala", "start": 0.0, "end": 0.4}]
+    ass = build_ass(words, "Título", 3.0, cta="Comenta aí!", cta_seconds=3.0, total=20.0)
+    cta_line = next(line for line in ass.splitlines() if "Comenta aí!" in line)
+    assert cta_line.startswith("Dialogue: 1,0:00:17.00,0:00:20.00,Title")
+    # vídeo curto: a chamada não pode começar antes do título acabar
+    short = build_ass(words, "Título", 3.0, cta="Comenta aí!", cta_seconds=3.0, total=4.5)
+    assert "0:00:03.00,0:00:04.50" in short
+    assert "Comenta" not in build_ass(words, "T", 3.0, cta="Comenta aí!", total=3.5)

@@ -34,6 +34,12 @@ TOPIC_GAP_S = 1.2
 FILLER_OPENERS = ("bom", "enfim", "pronto", "entao", "deixa eu", "deixe eu", "ok", "beleza",
                   "hum", "ne", "e ai")
 FILLER_WORDS = {"camera", "microfone", "audio", "ajustar", "gravando", "gravar", "hum"}
+# Frases que fecham uma ideia: bons finais (o "punchline")
+CONCLUSIVE = ("por isso", "ou seja", "resumindo", "no fim", "no final", "a licao", "o segredo",
+              "a verdade", "conclusao", "moral da historia", "e isso", "o importante", "entao e",
+              "a dica", "nunca mais", "pra sempre", "para sempre", "foi assim", "aprendi")
+# Começos de frase que deixam o final pendurado
+DANGLING_OPENERS = ("mas", "e", "porque", "so que", "ai", "tipo", "inclusive", "alem disso", "e ai")
 
 
 def _norm(text: str) -> str:
@@ -83,7 +89,12 @@ def _sentence_features(s: dict, words: list[dict], energy: np.ndarray) -> dict:
     seg_energy = energy[a:b] if len(energy) else np.array([])
     tokens = [_norm(w["word"]) for w in ws]
     opener = " ".join(tokens[:2])
+    joined = " ".join(tokens)
+    last_word = ws[-1]["word"].rstrip() if ws else ""
     return {
+        "conclusive": any(f" {c} " in f" {joined} " for c in CONCLUSIVE),
+        "dangling": (any(opener == d or opener.startswith(d + " ") for d in DANGLING_OPENERS)
+                     or last_word.endswith((",", ";", ":", "..."))),
         "filler": (any(opener == f or opener.startswith(f + " ") for f in FILLER_OPENERS)
                    or any(t in FILLER_WORDS for t in tokens) or len(tokens) <= 1),
         "rate": len(ws) / dur,  # palavras/s
@@ -104,9 +115,11 @@ def _zscore(values: list[float]) -> np.ndarray:
 
 def select_shorts(words: list[dict], energy: list[float],
                   min_s: float = config.SHORT_MIN_S, max_s: float = config.SHORT_MAX_S,
-                  max_shorts: int = config.MAX_SHORTS) -> list[dict]:
+                  max_shorts: int = config.MAX_SHORTS,
+                  target_s: float = config.SHORT_TARGET_S) -> list[dict]:
     if not words:
         return []
+    target_s = min(max(target_s, min_s), max_s)
     sentences = split_sentences(words)
     energy_arr = np.array(energy, dtype=float)
     feats = [_sentence_features(s, words, energy_arr) for s in sentences]
@@ -143,15 +156,23 @@ def select_shorts(words: list[dict], energy: list[float],
             body = float(np.mean([sent_score[k] for k in kept]))
             hook = (1.0 * min(first["hooks"], 2) + 1.2 * first["question"]
                     + 0.6 * (first["numbers"] > 0) + 0.5 * np.clip(energy_z[i], 0, 2))
-            ending = 0.8 if last["complete"] else -1.0
+            # Final: precisa fechar a ideia; frase pendurada faz o público sair antes
+            ending = (0.5 if last["complete"] else -1.0) + 0.6 * last["conclusive"] \
+                + 0.3 * last["exclaim"] - 0.8 * last["dangling"]
+            # "Rabo fraco": se o melhor já passou, o público sai antes do fim
+            tail = float(np.mean([sent_score[k] for k in kept[-2:]]))
+            weak_tail = 0.6 * min(0.0, tail - body)
             topic_breaks = sum(gaps_before[k] > TOPIC_GAP_S for k in kept[1:])
             removed = (j - i + 1) - len(kept)
-            # leve preferência por ~45s: dá tempo de desenvolver sem cansar
-            length = -abs(dur - (min_s + max_s) / 2) / max_s
+            # Perto do alvo (~38s); passar dele pesa mais que ficar abaixo
+            over = max(0.0, dur - target_s)
+            under = max(0.0, target_s - dur)
+            length = -(1.6 * over + 0.6 * under) / max_s
             windows.append({
                 "start": sentences[i]["start"], "end": sentences[j]["end"],
                 "kept": list(kept), "speech_duration": round(dur, 2),
-                "score_raw": body + hook + ending + length - 0.5 * topic_breaks - 0.2 * removed,
+                "score_raw": (body + hook + ending + weak_tail + length
+                              - 0.5 * topic_breaks - 0.2 * removed),
             })
 
     # Seleção gulosa sem sobreposição (como NMS)

@@ -400,6 +400,24 @@ abstract class AppLocalizations {
   /// **'Título nos primeiros segundos'**
   String get titleOverlay;
 
+  /// No description provided for @cta.
+  ///
+  /// In pt, this message translates to:
+  /// **'Chamada no final'**
+  String get cta;
+
+  /// No description provided for @ctaHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Pede para comentar nos últimos segundos'**
+  String get ctaHint;
+
+  /// No description provided for @ctaText.
+  ///
+  /// In pt, this message translates to:
+  /// **'Texto da chamada'**
+  String get ctaText;
+
   /// No description provided for @autoReframe.
   ///
   /// In pt, this message translates to:

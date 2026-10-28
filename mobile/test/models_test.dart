@@ -58,6 +58,16 @@ void main() {
       expect(json['end'], closeTo(short.windowEnd - 10, 0.01));
     });
 
+    test('shorts antigos sem cta continuam funcionando', () {
+      expect(short.cta, isFalse);
+      expect(short.ctaText, isEmpty);
+    });
+
+    test('ligar a chamada no final envia o texto', () {
+      final draft = ShortDraft.fromShort(short).copyWith(cta: true, ctaText: 'Comenta aí!');
+      expect(draft.diff(short).toJson(), {'cta': true, 'cta_text': 'Comenta aí!'});
+    });
+
     test('voltar ao enquadramento automático', () {
       final draft = ShortDraft.fromShort(short).copyWith(autoReframe: true);
       expect(draft.diff(short).toJson(), {'auto_reframe': true});

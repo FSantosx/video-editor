@@ -32,8 +32,16 @@ TRANSCRIBER = os.getenv("TRANSCRIBER", "whisper")
 # Regras dos shorts
 SHORT_MIN_S = _env_float("SHORT_MIN_S", 30)
 SHORT_MAX_S = _env_float("SHORT_MAX_S", 60)
+# Duração preferida (dentro de MIN/MAX). Feedback do YouTube: com 55s a retenção média
+# ficou em 48,8%; cortes mais curtos seguram melhor até o fim.
+SHORT_TARGET_S = _env_float("SHORT_TARGET_S", 38)
 MAX_SHORTS = _env_int("MAX_SHORTS", 5)
-PAUSE_CUT_S = _env_float("PAUSE_CUT_S", 0.35)  # pausas maiores que isso viram corte seco
+PAUSE_CUT_S = _env_float("PAUSE_CUT_S", 0.25)  # pausas maiores que isso viram corte seco
+
+# Chamada no final do corte (pede comentário: ajuda a completar o vídeo e engajar)
+CTA_ENABLED = os.getenv("CTA_ENABLED", "1") == "1"
+CTA_TEXT = os.getenv("CTA_TEXT", "E você, o que acha? Comenta aí!")
+CTA_SECONDS = _env_float("CTA_SECONDS", 3.0)
 
 # Formatos gerados para cada trecho escolhido (largura x altura da saída)
 FORMAT_SIZES = {"9:16": (1080, 1920), "1:1": (1080, 1080)}

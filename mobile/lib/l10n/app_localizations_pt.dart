@@ -184,6 +184,15 @@ class AppLocalizationsPt extends AppLocalizations {
   String get titleOverlay => 'Título nos primeiros segundos';
 
   @override
+  String get cta => 'Chamada no final';
+
+  @override
+  String get ctaHint => 'Pede para comentar nos últimos segundos';
+
+  @override
+  String get ctaText => 'Texto da chamada';
+
+  @override
   String get autoReframe => 'Enquadramento automático';
 
   @override

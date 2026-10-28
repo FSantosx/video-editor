@@ -146,12 +146,16 @@ def render_short(source: Path, short: dict, meta: dict, words: list[dict],
     W, H = out_size(short)
 
     ass_name = None
-    if short["captions"]["enabled"] or short["title_overlay"]["enabled"]:
+    cta = short.get("cta") or {}  # shorts antigos não têm o campo
+    cta_text = cta.get("text") if cta.get("enabled") else None
+    if short["captions"]["enabled"] or short["title_overlay"]["enabled"] or cta_text:
         out_words = map_words_to_output(words, short["clips"])
         title = short["title"] if short["title_overlay"]["enabled"] else None
         (out_dir / ass).write_text(
             build_ass(out_words, title, short["title_overlay"]["seconds"],
-                      captions=short["captions"]["enabled"], size=(W, H)),
+                      captions=short["captions"]["enabled"], size=(W, H),
+                      cta=cta_text, cta_seconds=config.CTA_SECONDS,
+                      total=short["duration"]),
             encoding="utf-8")
         ass_name = ass  # relativo ao cwd: evita escapar caminhos (e o C:\ do Windows)
 

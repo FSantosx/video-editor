@@ -46,8 +46,14 @@ def _chunks(words: list[dict]) -> list[list[dict]]:
     return chunks
 
 
+def _plain(text: str) -> str:
+    return text.replace("\\", "").replace("{", "").replace("}", "")
+
+
 def build_ass(words: list[dict], title: str | None, title_seconds: float,
-              captions: bool = True, size: tuple[int, int] = (1080, 1920)) -> str:
+              captions: bool = True, size: tuple[int, int] = (1080, 1920),
+              cta: str | None = None, cta_seconds: float = 3.0,
+              total: float | None = None) -> str:
     W, H = size
     vertical = H > W
     # Legenda no terço de baixo, acima da interface do app (Reels/TikTok) no 9:16
@@ -71,9 +77,15 @@ def build_ass(words: list[dict], title: str | None, title_seconds: float,
     ]
 
     if title and title_seconds > 0:
-        safe = title.replace("\\", "").replace("{", "").replace("}", "")
         lines.append(f"Dialogue: 1,{_ts(0)},{_ts(title_seconds)},Title,,0,0,0,,"
-                     f"{{\\fad(150,250)}}{safe}")
+                     f"{{\\fad(150,250)}}{_plain(title)}")
+
+    if cta and total and cta_seconds > 0:
+        # Chamada no topo nos últimos segundos (sem colidir com o título do início)
+        start = max(total - cta_seconds, title_seconds if title else 0.0, 0.0)
+        if total - start >= 1.0:
+            lines.append(f"Dialogue: 1,{_ts(start)},{_ts(total)},Title,,0,0,0,,"
+                         f"{{\\fad(200,0)}}{_plain(cta)}")
 
     if captions:
         chunks = _chunks(words)

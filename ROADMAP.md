@@ -45,6 +45,16 @@ Funcionando em produção:
 - A transcrição falhava com `open() got an unexpected keyword argument 'metadata_errors'`
   (ver tabela acima).
 
+### Feedback de performance (YouTube)
+
+| Data | Corte | Duração | Ficaram para assistir | Retenção média | Ajustes feitos |
+|---|---|---|---|---|---|
+| 2026-10-28 | "Renan fala de seus arrependimentos da campanha" (62 views) | 55s | 62,3% (gancho bom) | 0:26 (48,8%) | Alvo de duração 38s (`SHORT_TARGET_S`), pausas cortadas a partir de 0,25s (antes 0,35s), seleção premia final conclusivo e pune final pendurado ou "rabo fraco", chamada para comentar nos últimos 3s (`CTA_*`) |
+
+Próximo passo: comparar a retenção média dos cortes gerados depois desses ajustes. A meta é
+passar de 60% de retenção média e manter "ficaram para assistir" acima de 60%. Amostras pequenas
+(menos de 500 views) oscilam muito; olhar a média de vários cortes.
+
 ---
 
 ## Próximas evoluções (por impacto)

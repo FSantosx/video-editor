@@ -12,6 +12,7 @@ legendas...) e o render só lê ele. Formato:
   "reframe": {"mode": "crop", "centers": [0.52, 0.48, ...]},  # 1 centro X (0-1) por clip
   "captions": {"enabled": true},
   "title_overlay": {"enabled": true, "seconds": 3.0},
+  "cta": {"enabled": true, "text": "E você, o que acha? Comenta aí!"},  # chamada no fim
   "render": {"status": "pending", "file": null, "error": null, "version": 0}
 }
 """
@@ -94,6 +95,7 @@ def build_short(idx: int, candidate: dict, words: list[dict], fmt: str = "9:16",
         "reframe": {"mode": "auto", "centers": []},
         "captions": {"enabled": True},
         "title_overlay": {"enabled": True, "seconds": 3.0},
+        "cta": {"enabled": config.CTA_ENABLED, "text": config.CTA_TEXT},
         "render": {"status": "pending", "file": None, "error": None, "version": 0},
     }
 

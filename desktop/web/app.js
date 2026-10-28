@@ -240,6 +240,7 @@ const editor = $("#editor");
 const f = {
   title: $("#f-title"), start: $("#f-start"), end: $("#f-end"), captions: $("#f-captions"),
   titleOverlay: $("#f-title-overlay"), auto: $("#f-auto"), crop: $("#f-crop"), sync: $("#f-sync"),
+  cta: $("#f-cta"), ctaText: $("#f-cta-text"),
 };
 
 function openEditor(video, shortId) {
@@ -266,6 +267,8 @@ function openEditor(video, shortId) {
   f.end.value = short.window.end;
   f.captions.checked = short.captions.enabled;
   f.titleOverlay.checked = short.title_overlay.enabled;
+  f.cta.checked = Boolean(short.cta?.enabled);
+  f.ctaText.value = short.cta?.text ?? "";
   f.auto.checked = !short.reframe.manual;
   f.crop.value = short.reframe.centers?.[0] ?? 0.5;
   // Recorte manual só faz sentido quando o original é mais largo que a saída
@@ -287,8 +290,9 @@ function updateRangeLabels() {
   $("#o-end").textContent = fmtTime(end);
   $("#o-length").textContent = `${Math.round(end - start)}s no original · pausas longas são cortadas automaticamente`;
   $("#crop-row").hidden = f.auto.checked;
+  f.ctaText.hidden = !f.cta.checked;
 }
-for (const el of [f.start, f.end, f.auto]) el.addEventListener("input", updateRangeLabels);
+for (const el of [f.start, f.end, f.auto, f.cta]) el.addEventListener("input", updateRangeLabels);
 
 editor.addEventListener("click", (e) => {
   if (e.target.closest("[data-close]") || e.target === editor) editor.close();
@@ -312,6 +316,10 @@ $("#editor-form").addEventListener("submit", async (e) => {
   }
   if (f.captions.checked !== short.captions.enabled) patch.captions = f.captions.checked;
   if (f.titleOverlay.checked !== short.title_overlay.enabled) patch.title_overlay = f.titleOverlay.checked;
+  if (f.cta.checked !== Boolean(short.cta?.enabled)) patch.cta = f.cta.checked;
+  if (f.cta.checked && f.ctaText.value.trim() && f.ctaText.value.trim() !== short.cta?.text) {
+    patch.cta_text = f.ctaText.value.trim();
+  }
   if (!$("#reframe-box").hidden) {
     if (f.auto.checked && short.reframe.mode !== "auto") patch.auto_reframe = true;
     if (!f.auto.checked) patch.crop_center = Number(f.crop.value);
