@@ -48,9 +48,15 @@ jobs:
           Set-AppEnvironment | Out-Null
           & $VenvPython -m pip install pytest httpx --quiet
           Push-Location backend
-          & $VenvPython -m pytest -q
+          $out = & $VenvPython -m pytest -q -rf --tb=short 2>&1
           $code = $LASTEXITCODE
           Pop-Location
+          $out | ForEach-Object { Write-Host $_ }
+          if ($code -ne 0) {
+            # Anotações aparecem no resumo do run (e na API), sem precisar abrir o log
+            $out | Where-Object { $_ -match '^(FAILED|E )' } | Select-Object -First 9 |
+              ForEach-Object { Write-Host "::error::$_" }
+          }
           exit $code
 
       - name: Ponta a ponta (start.ps1 + upload + cortes 9:16 e 1:1)
