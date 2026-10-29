@@ -18,6 +18,9 @@ import numpy as np
 SAMPLES_PER_SECOND = 2
 MAX_SAMPLES_PER_CLIP = 6
 DETECT_WIDTH = 960
+# O Haar dá falso positivo em ~4% dos frames sem rosto (texturas, gráficos): só
+# considera que há rosto se ele aparecer em pelo menos esta fração das amostras
+MIN_FACE_RATIO = 0.2
 
 
 def _detector():
@@ -51,6 +54,7 @@ def compute_reframe(source: Path, clips: list[dict], width: int, height: int,
     read_frame, close = _frame_reader(source, width, height)
     detector = _detector()
     centers: list[float | None] = []
+    samples = hits = 0
     try:
         for c in clips:
             dur = c["out"] - c["in"]
@@ -58,14 +62,18 @@ def compute_reframe(source: Path, clips: list[dict], width: int, height: int,
             found = []
             for t in np.linspace(c["in"], c["out"], n + 2)[1:-1]:
                 frame = read_frame(float(t))
-                if frame is not None and (cx := _face_center(frame, detector)) is not None:
+                if frame is None:
+                    continue
+                samples += 1
+                if (cx := _face_center(frame, detector)) is not None:
                     found.append(cx)
+                    hits += 1
             centers.append(float(np.median(found)) if found else None)
     finally:
         close()
 
     known = [c for c in centers if c is not None]
-    if not known:
+    if not known or hits < max(2, MIN_FACE_RATIO * samples):  # poucos acertos = falso positivo
         return {"mode": "blur", "centers": []}
     # clip sem rosto herda o vizinho anterior (ou o primeiro conhecido)
     filled, last = [], known[0]

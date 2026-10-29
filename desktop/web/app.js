@@ -243,6 +243,7 @@ const f = {
   title: $("#f-title"), start: $("#f-start"), end: $("#f-end"), captions: $("#f-captions"),
   titleOverlay: $("#f-title-overlay"), auto: $("#f-auto"), crop: $("#f-crop"), sync: $("#f-sync"),
   cta: $("#f-cta"), ctaText: $("#f-cta-text"), teaser: $("#f-teaser"),
+  loop: $("#f-loop"), zoom: $("#f-zoom"),
 };
 
 function openEditor(video, shortId) {
@@ -272,6 +273,8 @@ function openEditor(video, shortId) {
   f.titleOverlay.checked = short.title_overlay.enabled;
   f.cta.checked = Boolean(short.cta?.enabled);
   f.teaser.checked = Boolean(short.teaser?.enabled);
+  f.loop.checked = Boolean(short.loop?.enabled);
+  f.zoom.checked = Boolean(short.zoom?.enabled);
   $("#o-teaser").textContent = short.teaser?.text ? `“${short.teaser.text}”` : "";
   f.ctaText.value = short.cta?.text ?? "";
   f.auto.checked = !short.reframe.manual;
@@ -298,6 +301,8 @@ function updateRangeLabels() {
   f.ctaText.hidden = !f.cta.checked;
 }
 for (const el of [f.start, f.end, f.auto, f.cta]) el.addEventListener("input", updateRangeLabels);
+f.loop.addEventListener("change", () => { if (f.loop.checked) f.teaser.checked = true; });
+f.teaser.addEventListener("change", () => { if (!f.teaser.checked) f.loop.checked = false; });
 
 editor.addEventListener("click", (e) => {
   if (e.target.closest("[data-close]") || e.target === editor) editor.close();
@@ -325,6 +330,8 @@ $("#editor-form").addEventListener("submit", async (e) => {
   if (f.titleOverlay.checked !== short.title_overlay.enabled) patch.title_overlay = f.titleOverlay.checked;
   if (f.cta.checked !== Boolean(short.cta?.enabled)) patch.cta = f.cta.checked;
   if (f.teaser.checked !== Boolean(short.teaser?.enabled)) patch.teaser = f.teaser.checked;
+  if (f.loop.checked !== Boolean(short.loop?.enabled)) patch.loop = f.loop.checked;
+  if (f.zoom.checked !== Boolean(short.zoom?.enabled)) patch.zoom = f.zoom.checked;
   if (f.cta.checked && f.ctaText.value.trim() && f.ctaText.value.trim() !== short.cta?.text) {
     patch.cta_text = f.ctaText.value.trim();
   }

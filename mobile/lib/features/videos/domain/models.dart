@@ -79,6 +79,8 @@ class Short {
     required this.ctaText,
     required this.teaser,
     required this.teaserText,
+    required this.loop,
+    required this.zoom,
     required this.render,
   });
 
@@ -106,6 +108,8 @@ class Short {
       ctaText: cta?['text'] as String? ?? '',
       teaser: teaser?['enabled'] as bool? ?? false,
       teaserText: teaser?['text'] as String? ?? '',
+      loop: (json['loop'] as Map<String, dynamic>?)?['enabled'] as bool? ?? false,
+      zoom: (json['zoom'] as Map<String, dynamic>?)?['enabled'] as bool? ?? false,
       render: ShortRender.fromJson(json['render'] as Map<String, dynamic>),
     );
   }
@@ -133,6 +137,12 @@ class Short {
   /// Abertura com teaser: começa com o momento mais forte e volta ao início.
   final bool teaser;
   final String teaserText;
+
+  /// Final em loop: termina antes do teaser e emenda no início.
+  final bool loop;
+
+  /// Zoom dinâmico (punch-in alternado a cada corte).
+  final bool zoom;
   final ShortRender render;
 }
 
@@ -201,6 +211,8 @@ class ShortPatch {
     this.cta,
     this.ctaText,
     this.teaser,
+    this.loop,
+    this.zoom,
   });
 
   final String? title;
@@ -214,6 +226,8 @@ class ShortPatch {
   final bool? cta;
   final String? ctaText;
   final bool? teaser;
+  final bool? loop;
+  final bool? zoom;
 
   Map<String, dynamic> toJson() => {
         if (title != null) 'title': title,
@@ -227,6 +241,8 @@ class ShortPatch {
         if (cta != null) 'cta': cta,
         if (ctaText != null) 'cta_text': ctaText,
         if (teaser != null) 'teaser': teaser,
+        if (loop != null) 'loop': loop,
+        if (zoom != null) 'zoom': zoom,
       };
 
   bool get isEmpty => toJson().isEmpty;

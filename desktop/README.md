@@ -56,6 +56,10 @@ Edite `desktop\config.env` (criado na instalação) e reinicie:
 | `FORMATS` | `9:16,1:1` | só `9:16` ou só `1:1`, se preferir |
 | `MAX_SHORTS` | `8` | quantos trechos escolher por vídeo |
 | `SHORT_MIN_S` / `SHORT_MAX_S` | `30` / `60` | duração dos cortes, em segundos |
+| `TEASER_ENABLED` | `1` | abertura com o momento mais forte do corte |
+| `LOOP_ENABLED` | `1` | final em loop: termina antes do teaser e emenda no início |
+| `ZOOM_ENABLED` / `ZOOM_PUNCH` | `1` / `1.12` | zoom dinâmico a cada corte e quanto aproxima |
+| `ANTHROPIC_API_KEY` | vazio | o Claude escreve os títulos de gancho (sem chave: heurística) |
 | `VIDEO_ENCODER` | `auto` | `libx264` força a CPU |
 | `NVENC_CQ` | `21` | qualidade: menor é melhor e gera arquivo maior (18 a 24) |
 | `WORKERS` | `2` | cortes renderizados ao mesmo tempo |

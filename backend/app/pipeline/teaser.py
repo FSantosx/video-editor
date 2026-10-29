@@ -10,7 +10,7 @@ for longa, usa só o começo dela, terminando numa palavra: o corte no meio da
 ideia gera curiosidade ("e foi aí que eu perdi...").
 """
 from .. import config
-from .edit import build_clips, words_in
+from .edit import build_clips, clips_duration, main_clips, render_clips, update_duration, words_in
 from .select import CONCLUSIVE, _norm, score_sentences, speech_duration
 
 TEASER_MIN_S = 1.2
@@ -33,7 +33,8 @@ def _output_offset(t: float, segments: list[dict]) -> float:
 
 
 def pick_teaser(words: list[dict], energy: list[float], segments: list[dict],
-                max_s: float = config.TEASER_MAX_S) -> dict | None:
+                max_s: float = config.TEASER_MAX_S,
+                earliest: float = EARLIEST_FRACTION) -> dict | None:
     """Escolhe o trecho do teaser. Retorna {"start", "end", "text"} (tempo do original) ou None."""
     if not segments or not words:
         return None
@@ -44,7 +45,7 @@ def pick_teaser(words: list[dict], energy: list[float], segments: list[dict],
     for s, f, score in zip(sentences, feats, sent_score):
         if f["filler"] or not _inside(s, segments):
             continue
-        if _output_offset(s["start"], segments) < EARLIEST_FRACTION * total:
+        if _output_offset(s["start"], segments) < earliest * total:
             continue
         ws = words[s["word_idx"][0]: s["word_idx"][1]]
         if speech_duration(ws) <= max_s:
@@ -69,10 +70,41 @@ def pick_teaser(words: list[dict], energy: list[float], segments: list[dict],
 
 
 def build_teaser(words: list[dict], energy: list[float], segments: list[dict],
-                 enabled: bool = config.TEASER_ENABLED) -> dict:
-    """Campo "teaser" do JSON do short."""
-    found = pick_teaser(words, energy, segments)
+                 enabled: bool = config.TEASER_ENABLED,
+                 for_loop: bool = config.LOOP_ENABLED) -> dict:
+    """Campo "teaser" do JSON do short.
+
+    for_loop: o teaser sai da parte final do trecho, porque no loop o corte termina
+    antes dele (tudo depois do teaser fica de fora).
+    """
+    found = None
+    if for_loop:
+        # No loop o corte termina no teaser: ele precisa vir depois de LOOP_MIN_S de fala
+        total = sum(g["end"] - g["start"] for g in segments)
+        need = (config.LOOP_MIN_S - config.TEASER_MAX_S) / total if total else 1.0
+        found = pick_teaser(words, energy, segments,
+                            earliest=max(config.LOOP_TEASER_FROM, need))
+    if not found:  # sem loop (ou nenhuma frase boa no fim): teaser normal
+        found = pick_teaser(words, energy, segments, earliest=EARLIEST_FRACTION)
     if not found:
         return {"enabled": False, "clips": [], "text": ""}
     clips = build_clips(words_in(words, found["start"], found["end"]))
     return {"enabled": enabled and bool(clips), "clips": clips, "text": found["text"]}
+
+
+def loop_possible(short: dict) -> bool:
+    """Loop precisa de teaser ligado e de corte que não fique curto demais."""
+    teaser = short.get("teaser") or {}
+    if not (teaser.get("enabled") and teaser.get("clips")):
+        return False
+    trial = {**short, "loop": {"enabled": True}}
+    main = main_clips(trial)
+    return bool(main) and clips_duration(render_clips(trial)) >= config.LOOP_MIN_S
+
+
+def apply_loop(short: dict, enabled: bool = config.LOOP_ENABLED) -> bool:
+    """Liga/desliga o final em loop. Retorna se ficou ligado."""
+    on = enabled and loop_possible(short)
+    short["loop"] = {"enabled": on}
+    update_duration(short)
+    return on

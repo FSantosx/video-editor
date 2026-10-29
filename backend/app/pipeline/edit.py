@@ -81,9 +81,49 @@ def teaser_clips(short: dict) -> list[dict]:
     return list(teaser.get("clips") or []) if teaser.get("enabled") else []
 
 
+def loop_cut(short: dict) -> float | None:
+    """Ponto (tempo do original) onde o corte termina no modo loop, ou None."""
+    loop = short.get("loop") or {}
+    teaser = teaser_clips(short)
+    if not (loop.get("enabled") and teaser):
+        return None
+    return teaser[0]["in"] + EDGE_PAD_S - 0.02  # logo antes da 1ª palavra do teaser
+
+
+def main_clips(short: dict) -> list[dict]:
+    """Corte principal; no modo loop, só até a frase do teaser."""
+    cut = loop_cut(short)
+    if cut is None:
+        return list(short["clips"])
+    out = []
+    for c in short["clips"]:
+        if c["in"] >= cut:
+            break
+        out.append({"in": c["in"], "out": round(min(c["out"], cut), 3)})
+    return [c for c in out if c["out"] - c["in"] > 0.1]
+
+
 def render_clips(short: dict) -> list[dict]:
     """O que vai para o vídeo, na ordem: teaser (se ligado) + corte principal."""
-    return teaser_clips(short) + list(short["clips"])
+    return teaser_clips(short) + main_clips(short)
+
+
+def clip_zooms(short: dict) -> list[float]:
+    """Zoom de cada clip de render_clips(), na mesma ordem.
+
+    - teaser: leve zoom de "prévia" (no loop, sem zoom: a emenda tem que ser invisível)
+    - corte: alterna normal / punch-in a cada jump cut (zoom dinâmico)
+    - loop: o último clip usa o mesmo zoom do teaser, para a volta ao início não "pular"
+    """
+    teaser, main = teaser_clips(short), main_clips(short)
+    looping = loop_cut(short) is not None
+    zoom_on = (short.get("zoom") or {}).get("enabled", False)
+    teaser_zoom = 1.0 if looping else config.TEASER_ZOOM
+    zooms = [teaser_zoom] * len(teaser)
+    main_zooms = [config.ZOOM_PUNCH if zoom_on and i % 2 else 1.0 for i in range(len(main))]
+    if looping and main_zooms:
+        main_zooms[-1] = teaser_zoom
+    return zooms + main_zooms
 
 
 def update_duration(short: dict) -> dict:
@@ -120,6 +160,8 @@ def build_short(idx: int, candidate: dict, words: list[dict], fmt: str = "9:16",
         "title_overlay": {"enabled": True, "seconds": 3.0},
         "cta": {"enabled": config.CTA_ENABLED, "text": config.CTA_TEXT},
         "teaser": dict(teaser or NO_TEASER),
+        "zoom": {"enabled": config.ZOOM_ENABLED},
+        "loop": {"enabled": False},  # ligado por teaser.build_loop() quando dá
         "render": {"status": "pending", "file": None, "error": None, "version": 0},
     }
     return update_duration(short)

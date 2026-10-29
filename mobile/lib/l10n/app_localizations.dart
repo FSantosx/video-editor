@@ -424,16 +424,40 @@ abstract class AppLocalizations {
   /// **'Começa com o momento mais forte e volta ao início'**
   String get teaserHint;
 
+  /// No description provided for @loop.
+  ///
+  /// In pt, this message translates to:
+  /// **'Final em loop'**
+  String get loop;
+
+  /// No description provided for @loopHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Termina antes do teaser e emenda no início'**
+  String get loopHint;
+
+  /// No description provided for @zoom.
+  ///
+  /// In pt, this message translates to:
+  /// **'Zoom dinâmico'**
+  String get zoom;
+
+  /// No description provided for @zoomHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Aproxima e afasta a cada corte'**
+  String get zoomHint;
+
   /// No description provided for @cta.
   ///
   /// In pt, this message translates to:
-  /// **'Chamada no final'**
+  /// **'Chamada para comentar'**
   String get cta;
 
   /// No description provided for @ctaHint.
   ///
   /// In pt, this message translates to:
-  /// **'Pede para comentar nos últimos segundos'**
+  /// **'No fim do vídeo (no meio quando o final é em loop)'**
   String get ctaHint;
 
   /// No description provided for @ctaText.

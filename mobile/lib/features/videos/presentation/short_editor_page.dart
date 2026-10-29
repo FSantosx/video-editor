@@ -168,7 +168,24 @@ class _EditorState extends ConsumerState<_Editor> {
           subtitle: Text(short.teaserText.isEmpty ? l10n.teaserHint : '“${short.teaserText}”',
               maxLines: 2, overflow: TextOverflow.ellipsis),
           value: _draft.teaser,
-          onChanged: (v) => setState(() => _draft = _draft.copyWith(teaser: v)),
+          // loop depende do teaser: desligar o teaser desliga o loop
+          onChanged: (v) => setState(
+              () => _draft = _draft.copyWith(teaser: v, loop: v ? _draft.loop : false)),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(l10n.loop),
+          subtitle: Text(l10n.loopHint),
+          value: _draft.loop,
+          onChanged: (v) => setState(
+              () => _draft = _draft.copyWith(loop: v, teaser: v ? true : _draft.teaser)),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(l10n.zoom),
+          subtitle: Text(l10n.zoomHint),
+          value: _draft.zoom,
+          onChanged: (v) => setState(() => _draft = _draft.copyWith(zoom: v)),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,

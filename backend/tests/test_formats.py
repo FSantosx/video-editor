@@ -153,15 +153,16 @@ def test_teaser_toggle_via_patch(client):
     v = wait_done(client, vid)
     s = v["shorts"][0]
     assert s["teaser"]["enabled"] and s["teaser"]["clips"]
-    with_teaser = s["duration"]
-    teaser_len = sum(c["out"] - c["in"] for c in s["teaser"]["clips"])
 
     r = client.patch(f"/videos/{vid}/shorts/{s['id']}", json={"teaser": False, "sync_group": True})
     assert r.status_code == 200
     v = wait_done(client, vid, version=2)
     for short in v["shorts"]:
         assert not short["teaser"]["enabled"]
-        assert abs(short["duration"] - (with_teaser - teaser_len)) < 0.01
+        assert not short["loop"]["enabled"]  # loop depende do teaser: desliga junto
+        # sem teaser (e sem loop) o corte volta a ter o trecho inteiro
+        full = sum(c["out"] - c["in"] for c in short["clips"])
+        assert abs(short["duration"] - full) < 0.01
         if short["reframe"]["mode"] == "crop":  # um centro por clip renderizado
             assert len(short["reframe"]["centers"]) == len(short["clips"])
     shorts_dir = client.store.video_dir(vid) / "shorts"
@@ -169,3 +170,30 @@ def test_teaser_toggle_via_patch(client):
                                  "-of", "csv=p=0", str(shorts_dir / v["shorts"][0]["render"]["file"])],
                                 capture_output=True, text=True).stdout)
     assert abs(real - v["shorts"][0]["duration"]) < 0.6
+
+
+def test_loop_and_zoom_toggle_via_patch(client):
+    with open(client.video_path, "rb") as f:
+        vid = client.post("/videos", files={"file": ("in.mp4", f, "video/mp4")}).json()["id"]
+    v = wait_done(client, vid)
+    s = v["shorts"][0]
+    assert s["zoom"]["enabled"]
+    looped = s["loop"]["enabled"]
+    full = sum(c["out"] - c["in"] for c in s["clips"])
+
+    r = client.patch(f"/videos/{vid}/shorts/{s['id']}",
+                     json={"loop": False, "zoom": False, "sync_group": True})
+    assert r.status_code == 200
+    v = wait_done(client, vid, version=2)
+    for short in v["shorts"]:
+        assert not short["loop"]["enabled"] and not short["zoom"]["enabled"]
+        teaser = sum(c["out"] - c["in"] for c in short["teaser"]["clips"]) \
+            if short["teaser"]["enabled"] else 0
+        assert abs(short["duration"] - (full + teaser)) < 0.01  # trecho inteiro de volta
+    if looped:
+        assert v["shorts"][0]["duration"] > s["duration"]
+
+    r = client.patch(f"/videos/{vid}/shorts/{s['id']}", json={"loop": True})
+    assert r.status_code in (200, 422)  # 422 se o loop deixaria o corte curto demais
+    if r.status_code == 200:
+        assert r.json()["loop"]["enabled"] and r.json()["teaser"]["enabled"]

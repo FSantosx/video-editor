@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .. import config
 from .captions import build_ass
-from .edit import map_words_to_output, render_clips, teaser_clips
+from .edit import clip_zooms, loop_cut, map_words_to_output, render_clips
 from .media import FFmpegError, run
 
 log = logging.getLogger("render")
@@ -43,9 +43,10 @@ def crop_box(sw: int, sh: int, out_w: int, out_h: int, center_x: float) -> tuple
 def _video_chain(i: int, short: dict, meta: dict, clip_idx: int, zoom: float = 1.0) -> str:
     W, H = out_size(short)
     tail = f"setsar=1,fps={config.OUT_FPS},format=yuv420p,setpts=PTS-STARTPTS[v{i}]"
-    if zoom > 1.0:  # teaser: leve zoom central para marcar que é uma prévia
+    if zoom > 1.0:  # punch-in / prévia do teaser; mira um pouco acima do centro (rosto)
         zw, zh = _even(W * zoom), _even(H * zoom)
-        tail = f"scale={zw}:{zh},crop={W}:{H}," + tail
+        x, y = _even((zw - W) / 2), _even((zh - H) * config.ZOOM_FOCUS_Y)
+        tail = f"scale={zw}:{zh},crop={W}:{H}:{x}:{y}," + tail
     mode = short["reframe"]["mode"]
 
     if mode == "crop":
@@ -93,7 +94,7 @@ def _codec_args() -> list[str]:
 def build_command(source: Path, short: dict, meta: dict, ass_name: str | None,
                   out_path: Path) -> list[str]:
     clips = render_clips(short)
-    n_teaser = len(teaser_clips(short))
+    zooms = clip_zooms(short)
     cmd = ["ffmpeg", "-y", "-hide_banner", "-v", "error", "-progress", "pipe:1", "-nostats"]
     for c in clips:
         cmd += ["-ss", f"{c['in']:.3f}", "-t", f"{c['out'] - c['in']:.3f}", "-i", str(source)]
@@ -101,8 +102,7 @@ def build_command(source: Path, short: dict, meta: dict, ass_name: str | None,
     parts = []
     for i, c in enumerate(clips):
         dur = c["out"] - c["in"]
-        parts.append(_video_chain(i, short, meta, i,
-                                  zoom=config.TEASER_ZOOM if i < n_teaser else 1.0))
+        parts.append(_video_chain(i, short, meta, i, zoom=zooms[i]))
         parts.append(f"[{i}:a]aresample=48000,aformat=channel_layouts=stereo,"
                      f"afade=t=in:d={AUDIO_FADE_S},"
                      f"afade=t=out:st={max(dur - AUDIO_FADE_S, 0):.3f}:d={AUDIO_FADE_S},"
@@ -162,7 +162,8 @@ def render_short(source: Path, short: dict, meta: dict, words: list[dict],
             build_ass(out_words, title, short["title_overlay"]["seconds"],
                       captions=short["captions"]["enabled"], size=(W, H),
                       cta=cta_text, cta_seconds=config.CTA_SECONDS,
-                      total=short["duration"], hook=hook),
+                      total=short["duration"], hook=hook,
+                      cta_middle=loop_cut(short) is not None),
             encoding="utf-8")
         ass_name = ass  # relativo ao cwd: evita escapar caminhos (e o C:\ do Windows)
 

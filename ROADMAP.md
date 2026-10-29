@@ -123,6 +123,26 @@ API falhar, uma heurística usa uma das primeiras frases com palavra de gancho o
 frase do teaser, que já está legendada). JSON `hook` e `titles_source` (`llm`/`heuristic`); editável
 no PATCH `hook`, no PC e no app. **Medir:** "continuaram assistindo" com gancho contra sem gancho.
 
+### ✅ Zoom dinâmico (feito em 2026-10-29)
+
+Os clips do corte alternam entre enquadramento normal e punch-in de 12% (`ZOOM_PUNCH`), mirando
+um pouco acima do centro (`ZOOM_FOCUS_Y`, onde costuma estar o rosto): cada jump cut vira uma
+mudança de enquadramento. Estático por clip (zoom animado no ffmpeg treme). `clip_zooms()` em
+`edit.py`; JSON `zoom: {enabled}`; PATCH `zoom`; liga/desliga no PC e no app.
+
+### ✅ Final em loop (feito em 2026-10-29)
+
+Com teaser, o corte termina logo antes da frase do teaser; ao recomeçar, o teaser soa como a
+continuação da fala. No loop, o teaser vem do fim do trecho (≥ 55% e depois de `LOOP_MIN_S` =
+`SHORT_MIN_S` de fala, para não deixar o corte abaixo do mínimo; se não der, o loop fica
+desligado naquele corte), o teaser e o último clip têm o mesmo zoom (emenda invisível) e a
+chamada para comentar vai para o meio (no fim, ela denunciaria o término). `main_clips()` e
+`loop_cut()` em `edit.py`; `apply_loop()` em `teaser.py`; JSON `loop: {enabled}`; PATCH `loop`.
+**Medir:** "% assistida média" acima de 100% indica replays.
+
+Também corrigido: o detector Haar dava falso positivo em ~4% dos frames sem rosto, e uma única
+detecção virava recorte. Agora exige rosto em ≥ 20% das amostras (`MIN_FACE_RATIO`).
+
 ### 0. Gancho do primeiro segundo (ligado à meta: continuaram assistindo de 56% para ≥ 65%)
 
 **Onde:** `backend/app/pipeline/select.py` (peso do `hook`) e `captions.py` (título na tela).

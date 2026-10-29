@@ -54,8 +54,12 @@ def _plain(text: str) -> str:
 def build_ass(words: list[dict], title: str | None, title_seconds: float,
               captions: bool = True, size: tuple[int, int] = (1080, 1920),
               cta: str | None = None, cta_seconds: float = 3.0,
-              total: float | None = None, hook: str | None = None) -> str:
-    """hook (texto curto de gancho) tem prioridade sobre title no topo do início."""
+              total: float | None = None, hook: str | None = None,
+              cta_middle: bool = False) -> str:
+    """hook (texto curto de gancho) tem prioridade sobre title no topo do início.
+
+    cta_middle: no final em loop a chamada vai para o meio (no fim, ela denunciaria o término).
+    """
     W, H = size
     vertical = H > W
     # Legenda no terço de baixo, acima da interface do app (Reels/TikTok) no 9:16
@@ -91,11 +95,16 @@ def build_ass(words: list[dict], title: str | None, title_seconds: float,
                      f"{{\\fad(150,250)}}{_plain(title)}")
 
     if cta and total and cta_seconds > 0:
-        # Chamada no topo nos últimos segundos (sem colidir com o título do início)
-        start = max(total - cta_seconds, title_seconds if (title or hook) else 0.0, 0.0)
-        if total - start >= 1.0:
-            lines.append(f"Dialogue: 1,{_ts(start)},{_ts(total)},Title,,0,0,0,,"
-                         f"{{\\fad(200,0)}}{_plain(cta)}")
+        after_title = title_seconds if (title or hook) else 0.0
+        if cta_middle:
+            start = max(total * 0.45, after_title + 0.5)
+            end = min(start + cta_seconds, total - 1.0)
+        else:  # topo nos últimos segundos (sem colidir com o título do início)
+            start = max(total - cta_seconds, after_title, 0.0)
+            end = total
+        if end - start >= 1.0:
+            lines.append(f"Dialogue: 1,{_ts(start)},{_ts(end)},Title,,0,0,0,,"
+                         f"{{\\fad(200,{200 if cta_middle else 0})}}{_plain(cta)}")
 
     if captions:
         chunks = _chunks(words)

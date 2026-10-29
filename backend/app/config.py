@@ -49,6 +49,19 @@ TEASER_ENABLED = os.getenv("TEASER_ENABLED", "1") == "1"
 TEASER_MAX_S = _env_float("TEASER_MAX_S", 3.5)
 TEASER_ZOOM = _env_float("TEASER_ZOOM", 1.08)  # leve zoom para marcar que é uma prévia
 
+# Zoom dinâmico: clips do corte alternam entre enquadramento normal e "punch-in"
+# (cada jump cut vira uma mudança de enquadramento, o que esconde o pulo e dá ritmo)
+ZOOM_ENABLED = os.getenv("ZOOM_ENABLED", "1") == "1"
+ZOOM_PUNCH = _env_float("ZOOM_PUNCH", 1.12)
+ZOOM_FOCUS_Y = _env_float("ZOOM_FOCUS_Y", 0.4)  # o zoom mira um pouco acima do centro (rosto)
+
+# Final em loop (exige teaser): o corte termina logo antes da frase do teaser; ao recomeçar,
+# o teaser soa como a continuação da última frase e a pessoa assiste de novo
+LOOP_ENABLED = os.getenv("LOOP_ENABLED", "1") == "1"
+LOOP_TEASER_FROM = _env_float("LOOP_TEASER_FROM", 0.55)  # teaser do loop vem do fim do trecho
+# o loop não pode deixar o corte abaixo da duração mínima
+LOOP_MIN_S = _env_float("LOOP_MIN_S", SHORT_MIN_S)
+
 # Título de gancho (texto na tela) e título do post. auto = Claude se houver
 # ANTHROPIC_API_KEY, senão heurística; llm = sempre tenta o Claude; heuristic = nunca usa
 TITLES_ENGINE = os.getenv("TITLES_ENGINE", "auto")

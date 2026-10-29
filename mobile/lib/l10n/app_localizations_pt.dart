@@ -196,10 +196,22 @@ class AppLocalizationsPt extends AppLocalizations {
   String get teaserHint => 'Começa com o momento mais forte e volta ao início';
 
   @override
-  String get cta => 'Chamada no final';
+  String get loop => 'Final em loop';
 
   @override
-  String get ctaHint => 'Pede para comentar nos últimos segundos';
+  String get loopHint => 'Termina antes do teaser e emenda no início';
+
+  @override
+  String get zoom => 'Zoom dinâmico';
+
+  @override
+  String get zoomHint => 'Aproxima e afasta a cada corte';
+
+  @override
+  String get cta => 'Chamada para comentar';
+
+  @override
+  String get ctaHint => 'No fim do vídeo (no meio quando o final é em loop)';
 
   @override
   String get ctaText => 'Texto da chamada';

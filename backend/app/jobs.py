@@ -13,7 +13,7 @@ from pathlib import Path
 from . import config, store
 from .pipeline import media
 from .pipeline.edit import build_short, render_clips
-from .pipeline.teaser import build_teaser
+from .pipeline.teaser import apply_loop, build_teaser
 from .pipeline.titles import generate_titles
 from .pipeline.reframe import compute_reframe
 from .pipeline.render import render_short
@@ -88,8 +88,12 @@ def analyze_video(vid: str) -> None:
 
     _progress(vid, "select")
     words = analysis["words"]
-    # O teaser soma até TEASER_MAX_S à duração: desconta do alvo para o total ficar perto dele
-    target = config.SHORT_TARGET_S - (0.8 * config.TEASER_MAX_S if config.TEASER_ENABLED else 0)
+    # O teaser soma até TEASER_MAX_S à duração: desconta do alvo para o total ficar perto dele.
+    # No loop o teaser só muda de lugar (o corte termina antes dele), então não soma nada.
+    adds_teaser = config.TEASER_ENABLED and not config.LOOP_ENABLED
+    target = config.SHORT_TARGET_S - (0.8 * config.TEASER_MAX_S if adds_teaser else 0)
+    if config.LOOP_ENABLED:  # o fim depois do teaser é cortado: trechos um pouco mais longos
+        target += 4
     candidates = select_shorts(words, analysis["energy"], target_s=target)
     teasers = [build_teaser(words, analysis["energy"], c.get("segments") or [c])
                for c in candidates]
@@ -104,7 +108,9 @@ def analyze_video(vid: str) -> None:
     shorts, next_id = [], 1
     for group, (cand, teaser) in enumerate(zip(candidates, teasers), start=1):
         for fmt in config.FORMATS:
-            shorts.append(build_short(next_id, cand, words, fmt=fmt, group=group, teaser=teaser))
+            short = build_short(next_id, cand, words, fmt=fmt, group=group, teaser=teaser)
+            apply_loop(short)
+            shorts.append(short)
             next_id += 1
     store.save_shorts(vid, shorts)
     store.update_video(vid, status="ready", step=None, progress=1.0,

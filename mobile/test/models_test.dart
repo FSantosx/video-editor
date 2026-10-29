@@ -79,6 +79,12 @@ void main() {
       expect(draft.diff(short).toJson(), {'hook': 'O ERRO QUE CUSTOU'});
     });
 
+    test('loop e zoom vão só quando mudam', () {
+      expect(short.loop, isFalse);
+      final draft = ShortDraft.fromShort(short).copyWith(loop: true, teaser: true, zoom: true);
+      expect(draft.diff(short).toJson(), {'teaser': true, 'loop': true, 'zoom': true});
+    });
+
     test('voltar ao enquadramento automático', () {
       final draft = ShortDraft.fromShort(short).copyWith(autoReframe: true);
       expect(draft.diff(short).toJson(), {'auto_reframe': true});

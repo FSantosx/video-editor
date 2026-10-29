@@ -1,0 +1,95 @@
+"""Zoom dinâmico (punch-in alternado) e final em loop."""
+import pytest
+
+from app import config
+from app.pipeline.captions import build_ass
+from app.pipeline.edit import EDGE_PAD_S, build_short, clip_zooms, main_clips, render_clips
+from app.pipeline.render import build_command
+from app.pipeline.teaser import apply_loop, build_teaser
+from test_pipeline import make_words
+
+# ~45s de fala com pausas longas entre frases (cada frase vira um clip)
+SCRIPT = [(f"Esta é a frase número {i} da história.", 0.6) for i in range(14)] + [
+    ("O maior erro foi confiar nas pesquisas!", 0.6),
+    ("Depois disso tudo mudou.", 0.6),
+]
+
+
+@pytest.fixture()
+def short():
+    words = make_words(SCRIPT)
+    cand = {"start": words[0]["start"], "end": words[-1]["end"], "title": "T", "score": 1, "text": ""}
+    teaser = build_teaser(words, [], [cand], enabled=True, for_loop=True)
+    s = build_short(1, cand, words, teaser=teaser)
+    s["zoom"] = {"enabled": True}
+    return s
+
+
+def test_loop_ends_right_before_teaser_sentence(short):
+    assert short["teaser"]["text"] == "O maior erro foi confiar nas pesquisas!"
+    assert apply_loop(short, True)
+    teaser_start = short["teaser"]["clips"][0]["in"]
+    main = main_clips(short)
+    first_word = teaser_start + EDGE_PAD_S
+    assert main[-1]["out"] < first_word  # termina antes da 1ª palavra do teaser
+    assert all(c["in"] < first_word for c in main)  # nada depois do teaser
+    assert render_clips(short)[0] == short["teaser"]["clips"][0]
+    assert abs(short["duration"] - sum(c["out"] - c["in"] for c in render_clips(short))) < 0.01
+    assert short["duration"] >= config.LOOP_MIN_S
+
+
+def test_loop_refused_when_cut_would_be_too_short(short, monkeypatch):
+    monkeypatch.setattr(config, "LOOP_MIN_S", 999)
+    assert not apply_loop(short, True)
+    assert not short["loop"]["enabled"]
+    assert main_clips(short) == short["clips"]  # sem loop, trecho inteiro
+
+
+def test_loop_teaser_comes_from_the_end_so_cut_keeps_min_length():
+    # frase forte cedo e outra no fim: no loop, o teaser tem que ser a do fim
+    script = [("O maior erro foi confiar nas pesquisas!", 0.6)] + SCRIPT[:12] + [
+        ("Nunca mais eu faço isso!", 0.6)]
+    words = make_words(script)
+    seg = [{"start": words[0]["start"], "end": words[-1]["end"]}]
+    assert build_teaser(words, [], seg, for_loop=True)["text"] == "Nunca mais eu faço isso!"
+
+
+def test_zoom_alternates_and_loop_seam_matches(short):
+    apply_loop(short, True)
+    zooms = clip_zooms(short)
+    n_teaser = len(short["teaser"]["clips"])
+    assert zooms[:n_teaser] == [1.0] * n_teaser  # no loop o teaser não tem zoom de "prévia"
+    main = zooms[n_teaser:]
+    assert main[0] == 1.0 and main[1] == config.ZOOM_PUNCH  # alterna a cada corte
+    assert main[-1] == zooms[0]  # emenda do loop: último clip igual ao primeiro
+
+
+def test_without_loop_teaser_keeps_preview_zoom(short):
+    apply_loop(short, False)
+    zooms = clip_zooms(short)
+    assert zooms[0] == config.TEASER_ZOOM
+
+
+def test_zoom_off_keeps_main_clips_unzoomed(short):
+    apply_loop(short, False)
+    short["zoom"] = {"enabled": False}
+    n_teaser = len(short["teaser"]["clips"])
+    assert set(clip_zooms(short)[n_teaser:]) == {1.0}
+
+
+def test_render_command_applies_one_zoom_per_clip(short, tmp_path):
+    apply_loop(short, True)
+    short["reframe"] = {"mode": "crop", "centers": [0.5] * len(render_clips(short))}
+    cmd = build_command(tmp_path / "s.mp4", short, {"width": 1920, "height": 1080}, None,
+                        tmp_path / "o.mp4")
+    graph = cmd[cmd.index("-filter_complex") + 1]
+    punch = sum(z > 1.0 for z in clip_zooms(short))
+    assert punch > 0 and graph.count("scale=1208:2150,crop=1080:1920:") == punch
+
+
+def test_cta_moves_to_middle_in_loop():
+    ass = build_ass([], None, 0, cta="Comenta aí!", cta_seconds=3.0, total=40.0, cta_middle=True)
+    line = next(line for line in ass.splitlines() if "Comenta aí!" in line)
+    assert line.startswith("Dialogue: 1,0:00:18.00,0:00:21.00")  # 45% de 40s
+    end = build_ass([], None, 0, cta="Comenta aí!", cta_seconds=3.0, total=40.0)
+    assert "0:00:37.00,0:00:40.00" in end

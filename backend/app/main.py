@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 from . import config, jobs, store
 from .pipeline import render, transcribe
 from .pipeline.edit import apply_window, render_clips, update_duration
-from .pipeline.teaser import build_teaser
+from .pipeline.teaser import apply_loop, build_teaser
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 ALLOWED_EXT = {".mp4", ".mov", ".m4v", ".mkv", ".webm"}
@@ -145,6 +145,10 @@ class ShortPatch(BaseModel):
     cta_text: str | None = Field(None, max_length=80)
     # abertura com teaser (momento mais forte do trecho antes do início)
     teaser: bool | None = None
+    # final em loop (o corte termina antes do teaser; ao recomeçar, o teaser continua a fala)
+    loop: bool | None = None
+    # zoom dinâmico (alterna enquadramento normal / punch-in a cada corte)
+    zoom: bool | None = None
     # aplica também aos outros formatos do mesmo trecho (ex.: o 1:1 do mesmo 9:16)
     sync_group: bool = False
 
@@ -166,11 +170,18 @@ def patch_short(vid: str, sid: int, patch: ShortPatch):
         raise HTTPException(422, "end além do fim do vídeo")
 
     window_changed = patch.start is not None or patch.end is not None
+    looping_now = (short.get("loop") or {}).get("enabled", False)
+    wants_loop = patch.loop if patch.loop is not None else looping_now
     new_teaser = None
-    if window_changed or (patch.teaser and not (short.get("teaser") or {}).get("clips")):
-        new_teaser = build_teaser(words, energy, [{"start": start, "end": end}])
-        if patch.teaser and not new_teaser["clips"]:
+    # Ligar o loop pede um teaser do fim do trecho (o corte termina antes dele)
+    if (window_changed or (patch.loop and not looping_now)
+            or (patch.teaser and not (short.get("teaser") or {}).get("clips"))):
+        new_teaser = build_teaser(words, energy, [{"start": start, "end": end}],
+                                  for_loop=bool(wants_loop))
+        if (patch.teaser or patch.loop) and not new_teaser["clips"]:
             raise HTTPException(422, "não achei um bom momento para o teaser neste trecho")
+        if patch.loop:
+            new_teaser["enabled"] = True
 
     def mutate(s):
         if window_changed:
@@ -182,6 +193,12 @@ def patch_short(vid: str, sid: int, patch: ShortPatch):
         if patch.teaser is not None:
             s.setdefault("teaser", {"enabled": False, "clips": [], "text": ""})
             s["teaser"]["enabled"] = patch.teaser and bool(s["teaser"]["clips"])
+        if window_changed or patch.loop is not None or patch.teaser is not None:
+            if not apply_loop(s, bool(wants_loop)) and patch.loop:
+                raise HTTPException(422, f"com o loop o corte ficaria com menos de "
+                                         f"{config.LOOP_MIN_S:.0f}s; aumente o trecho")
+        if patch.zoom is not None:
+            s["zoom"] = {"enabled": patch.zoom}
         update_duration(s)
         if patch.title is not None:
             s["title"] = patch.title.strip()
