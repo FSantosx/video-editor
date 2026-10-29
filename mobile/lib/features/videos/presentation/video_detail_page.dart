@@ -22,7 +22,17 @@ class VideoDetailPage extends ConsumerWidget {
     final video = async.value;
 
     return Scaffold(
-      appBar: AppBar(title: Text(video?.filename ?? l10n.shortsTitle)),
+      appBar: AppBar(
+        title: Text(video?.filename ?? l10n.shortsTitle),
+        actions: [
+          if (video != null && video.status == VideoStatus.ready)
+            IconButton(
+              tooltip: l10n.reprocess,
+              icon: const Icon(Icons.autorenew),
+              onPressed: () => reprocessVideo(context, ref, video.id, confirm: true),
+            ),
+        ],
+      ),
       body: switch (async) {
         AsyncValue(value: final v?) => _Body(video: v),
         AsyncValue(:final error?) => ErrorView(
@@ -35,19 +45,39 @@ class VideoDetailPage extends ConsumerWidget {
   }
 }
 
+/// Refaz a seleção e os cortes com a versão atual do servidor (sem transcrever de novo).
+Future<void> reprocessVideo(BuildContext context, WidgetRef ref, String videoId,
+    {bool confirm = false}) async {
+  final l10n = context.l10n;
+  if (confirm) {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.reprocessTitle),
+        content: Text(l10n.reprocessBody),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.reprocess)),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+  }
+  final result = await ref.read(videosRepositoryProvider)!.reanalyze(videoId);
+  if (!context.mounted) return;
+  if (result case Err(:final failure)) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(failure.message(l10n))));
+  }
+  ref.invalidate(videoDetailProvider(videoId)); // volta a acompanhar o progresso
+}
+
 class _Body extends ConsumerWidget {
   const _Body({required this.video});
 
   final Video video;
 
-  Future<void> _reanalyze(BuildContext context, WidgetRef ref) async {
-    final result = await ref.read(videosRepositoryProvider)!.reanalyze(video.id);
-    if (!context.mounted) return;
-    if (result case Err(:final failure)) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(failure.message(context.l10n))));
-    }
-    ref.invalidate(videoDetailProvider(video.id)); // volta a acompanhar o progresso
-  }
+  Future<void> _reanalyze(BuildContext context, WidgetRef ref) =>
+      reprocessVideo(context, ref, video.id);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -86,7 +116,7 @@ class _Body extends ConsumerWidget {
     if (video.shorts.isEmpty) {
       return Center(child: Text(l10n.noShortsFound));
     }
-    return RefreshIndicator(
+    final grid = RefreshIndicator(
       onRefresh: () => ref.refresh(videoDetailProvider(video.id).future),
       child: GridView.builder(
         padding: const EdgeInsets.all(12),
@@ -106,6 +136,22 @@ class _Body extends ConsumerWidget {
           );
         },
       ),
+    );
+    if (!video.outdated) return grid;
+    return Column(
+      children: [
+        MaterialBanner(
+          leading: const Icon(Icons.new_releases_outlined),
+          content: Text(l10n.outdatedBanner),
+          actions: [
+            FilledButton(
+              onPressed: () => reprocessVideo(context, ref, video.id, confirm: true),
+              child: Text(l10n.reprocess),
+            ),
+          ],
+        ),
+        Expanded(child: grid),
+      ],
     );
   }
 }

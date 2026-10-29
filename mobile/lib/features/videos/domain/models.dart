@@ -157,6 +157,7 @@ class Video {
     this.step,
     this.error,
     this.meta,
+    this.outdated = false,
   });
 
   factory Video.fromJson(Map<String, dynamic> json) => Video(
@@ -176,6 +177,7 @@ class Video {
           for (final s in (json['shorts'] as List? ?? const []))
             Short.fromJson(s as Map<String, dynamic>),
         ],
+        outdated: json['outdated'] as bool? ?? false,
       );
 
   final String id;
@@ -187,6 +189,9 @@ class Video {
   final String? error;
   final VideoMeta? meta;
   final List<Short> shorts;
+
+  /// Cortes gerados por uma versão antiga do pipeline (sem as novidades): dá para reprocessar.
+  final bool outdated;
 
   bool get isAnalyzing =>
       status == VideoStatus.uploading ||

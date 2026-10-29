@@ -52,6 +52,12 @@ Funcionando em produção:
   "Object of type bool is not JSON serializable" (corrigido em 8533107, também no Railway).
   As falhas dos testes do CI agora aparecem como anotações do GitHub.
 
+- Cortes gerados antes de uma novidade continuam sem ela (as decisões de edição ficam no JSON do
+  corte). Agora o servidor grava `pipeline_version` em cada vídeo (`PIPELINE_VERSION` em
+  `config.py`, **aumentar a cada mudança no jeito de gerar cortes**), a API marca `outdated`, e o
+  app e o PC mostram um aviso com o botão **Reprocessar** (refaz seleção e cortes sem transcrever
+  de novo).
+
 ### Feedback de performance (YouTube)
 
 | Data | Corte | Duração | Ficaram para assistir | Retenção média | Ajustes feitos |

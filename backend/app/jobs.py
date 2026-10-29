@@ -114,6 +114,7 @@ def analyze_video(vid: str) -> None:
             next_id += 1
     store.save_shorts(vid, shorts)
     store.update_video(vid, status="ready", step=None, progress=1.0,
+                       pipeline_version=config.PIPELINE_VERSION,
                        language=analysis.get("language"),
                        analysis_seconds=round(time.time() - t0, 1))
     log.info("vídeo %s analisado em %.1fs: %d trechos, %d shorts",

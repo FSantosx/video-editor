@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import config, jobs, store
-from .pipeline import render, transcribe
+from .pipeline import render, titles, transcribe
 from .pipeline.edit import apply_window, render_clips, update_duration
 from .pipeline.teaser import apply_loop, build_teaser
 
@@ -72,9 +72,16 @@ def health():
     return {"ok": True}
 
 
+def _with_shorts(video: dict) -> dict:
+    """Vídeo + cortes + aviso se os cortes vieram de uma versão antiga do pipeline."""
+    outdated = (video.get("status") == "ready"
+                and video.get("pipeline_version", 1) < config.PIPELINE_VERSION)
+    return {**video, "shorts": store.get_shorts(video["id"]), "outdated": outdated}
+
+
 @app.get("/videos", dependencies=[Depends(require_key)])
 def list_videos():
-    return [{**v, "shorts": store.get_shorts(v["id"])} for v in store.list_videos()]
+    return [_with_shorts(v) for v in store.list_videos()]
 
 
 @app.post("/videos", status_code=201, dependencies=[Depends(require_key)])
@@ -103,7 +110,7 @@ def upload_video(file: UploadFile = File(...)):
 
 @app.get("/videos/{vid}", dependencies=[Depends(require_key)])
 def get_video(vid: str):
-    return {**_video_or_404(vid), "shorts": store.get_shorts(vid)}
+    return _with_shorts(_video_or_404(vid))
 
 
 @app.delete("/videos/{vid}", status_code=204, dependencies=[Depends(require_key)])
@@ -123,10 +130,15 @@ def get_transcript(vid: str):
 
 @app.post("/videos/{vid}/reanalyze", dependencies=[Depends(require_key)])
 def reanalyze(vid: str):
-    """Refaz a seleção (sem transcrever de novo). Útil após mudar as regras."""
-    _video_or_404(vid)
+    """Refaz a seleção e os cortes com a versão atual (sem transcrever de novo).
+
+    Serve para aplicar novidades (teaser, gancho, zoom, loop...) a vídeos já processados.
+    """
+    video = _video_or_404(vid)
+    if video["status"] in ("queued", "analyzing", "uploading"):
+        raise HTTPException(409, "o vídeo ainda está sendo processado")
     jobs.submit_analysis(vid)
-    return store.get_video(vid)
+    return _with_shorts(store.get_video(vid))
 
 
 class ShortPatch(BaseModel):
@@ -286,6 +298,10 @@ def system():
     return {
         "desktop": config.DESKTOP_MODE,
         "formats": config.FORMATS,
+        "pipeline_version": config.PIPELINE_VERSION,
+        "features": {"teaser": config.TEASER_ENABLED, "loop": config.LOOP_ENABLED,
+                     "zoom": config.ZOOM_ENABLED, "cta": config.CTA_ENABLED,
+                     "titles": "llm" if titles.llm_available() else "heuristic"},
         "whisper_model": config.WHISPER_MODEL,
         "whisper_device": transcribe.describe_device() if loaded else config.WHISPER_DEVICE,
         "video_encoder": render.video_encoder(),

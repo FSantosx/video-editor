@@ -74,8 +74,9 @@ def wait_done(client, vid, version=1, timeout=600):  # runner Windows do CI é l
     while time.time() < end:
         v = client.get(f"/videos/{vid}").json()
         assert v["status"] != "error", v["error"]
-        if v["shorts"] and all(s["render"]["status"] == "done" and s["render"]["version"] >= version
-                               for s in v["shorts"]):
+        if v["status"] == "ready" and v["shorts"] and all(
+                s["render"]["status"] == "done" and s["render"]["version"] >= version
+                for s in v["shorts"]):
             return v
         time.sleep(0.5)
     pytest.fail("timeout")
@@ -197,3 +198,34 @@ def test_loop_and_zoom_toggle_via_patch(client):
     assert r.status_code in (200, 422)  # 422 se o loop deixaria o corte curto demais
     if r.status_code == 200:
         assert r.json()["loop"]["enabled"] and r.json()["teaser"]["enabled"]
+
+
+def test_old_video_is_flagged_and_reprocess_applies_new_features(client):
+    """Cortes gerados por versão antiga: aviso + reprocessar aplica teaser/zoom/loop sem reenviar."""
+    from app import config
+    with open(client.video_path, "rb") as f:
+        vid = client.post("/videos", files={"file": ("in.mp4", f, "video/mp4")}).json()["id"]
+    v = wait_done(client, vid)
+    assert v["outdated"] is False and v["pipeline_version"] == config.PIPELINE_VERSION
+
+    # simula um vídeo processado antes do zoom/loop: versão antiga e cortes sem os campos
+    client.store.update_video(vid, pipeline_version=config.PIPELINE_VERSION - 1)
+    old = client.store.get_shorts(vid)
+    for s in old:
+        for key in ("zoom", "loop", "teaser", "hook"):
+            s.pop(key, None)
+    client.store.save_shorts(vid, old)
+    v = client.get(f"/videos/{vid}").json()
+    assert v["outdated"] is True
+    assert any(x["outdated"] for x in client.get("/videos").json())
+
+    r = client.post(f"/videos/{vid}/reanalyze")
+    assert r.status_code == 200
+    v = wait_done(client, vid)
+    assert v["outdated"] is False
+    for s in v["shorts"]:
+        assert s["zoom"]["enabled"] is config.ZOOM_ENABLED and "loop" in s and "teaser" in s
+
+    system = client.get("/system").json()
+    assert system["pipeline_version"] == config.PIPELINE_VERSION
+    assert set(system["features"]) >= {"teaser", "loop", "zoom", "titles"}

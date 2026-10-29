@@ -156,6 +156,20 @@ class AppLocalizationsPt extends AppLocalizations {
   String get shortsTitle => 'Shorts';
 
   @override
+  String get reprocess => 'Reprocessar';
+
+  @override
+  String get reprocessTitle => 'Reprocessar cortes?';
+
+  @override
+  String get reprocessBody =>
+      'Os cortes deste vídeo serão gerados de novo com a versão atual (teaser, gancho, zoom e loop), sem precisar enviar o vídeo. Edições manuais nestes cortes serão perdidas.';
+
+  @override
+  String get outdatedBanner =>
+      'Estes cortes foram gerados por uma versão antiga, sem as novidades (teaser, gancho, zoom dinâmico e final em loop).';
+
+  @override
   String get analyzingHint =>
       'Você pode fechar o app: o processamento continua no servidor.';
 

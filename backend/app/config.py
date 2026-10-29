@@ -68,6 +68,13 @@ TITLES_ENGINE = os.getenv("TITLES_ENGINE", "auto")
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-5-5")
 CLAUDE_EFFORT = os.getenv("CLAUDE_EFFORT", "medium")
 
+# Versão do pipeline de edição: aumente quando a forma de gerar os cortes mudar.
+# Vídeos processados com versão menor aparecem como "desatualizados" e podem ser
+# reprocessados (sem transcrever de novo).
+# 1 = MVP · 2 = retenção (38s, final conclusivo, chamada) · 3 = teaser · 4 = gancho
+# 5 = zoom dinâmico + final em loop
+PIPELINE_VERSION = 5
+
 # Formatos gerados para cada trecho escolhido (largura x altura da saída)
 FORMAT_SIZES = {"9:16": (1080, 1920), "1:1": (1080, 1080)}
 FORMATS = [f.strip() for f in os.getenv("FORMATS", "9:16").split(",") if f.strip()]

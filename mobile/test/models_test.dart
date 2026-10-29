@@ -27,6 +27,12 @@ void main() {
       expect(video.isBusy, isFalse);
     });
 
+    test('vídeo antigo vem sem outdated e o servidor pode marcar', () {
+      expect(Video.fromJson(loadVideoJson()).outdated, isFalse);
+      final json = loadVideoJson()..['outdated'] = true;
+      expect(Video.fromJson(json).outdated, isTrue);
+    });
+
     test('status desconhecido não quebra o app', () {
       final json = loadVideoJson()..['status'] = 'algo_novo';
       expect(Video.fromJson(json).status, VideoStatus.error);

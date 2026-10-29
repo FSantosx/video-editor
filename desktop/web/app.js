@@ -80,6 +80,9 @@ async function loadSystem() {
     `<span class="chip ${gpu ? "good" : "warn"}" title="Onde roda a transcrição">Whisper ${esc(s.whisper_model)} · ${gpu ? "GPU" : s.whisper_device === "auto" ? "GPU/CPU" : "CPU"}</span>`,
     `<span class="chip ${nvenc ? "good" : ""}" title="Encoder de vídeo">${nvenc ? "NVENC (GPU)" : "x264 (CPU)"}</span>`,
     `<span class="chip">${s.formats.join(" + ")}</span>`,
+    `<span class="chip" title="Versão do pipeline de edição">v${s.pipeline_version ?? "?"} · ${
+      [s.features?.teaser && "teaser", s.features?.zoom && "zoom", s.features?.loop && "loop",
+       s.features?.titles === "llm" ? "gancho IA" : "gancho"].filter(Boolean).join(" · ")}</span>`,
     `<span class="chip" title="${esc(s.data_dir)}">${s.disk_free_gb} GB livres</span>`,
   ].join("");
 }
@@ -169,8 +172,13 @@ function renderDetail() {
         <div class="meta">${v.meta ? `${fmtTime(v.meta.duration)} · ${v.meta.width}×${v.meta.height}` : ""}${
           v.analysis_seconds ? ` · analisado em ${fmtTime(v.analysis_seconds)}` : ""}</div>
       </div>
-      ${state.system?.desktop ? `<button class="btn small" data-open-folder>📂 Abrir pasta dos cortes</button>` : ""}
-    </div>`;
+      <div class="group-actions">
+        ${v.status === "ready" ? `<button class="btn small" data-reanalyze title="Refaz a escolha e os cortes com a versão atual, sem transcrever de novo">🔄 Reprocessar</button>` : ""}
+        ${state.system?.desktop ? `<button class="btn small" data-open-folder>📂 Abrir pasta dos cortes</button>` : ""}
+      </div>
+    </div>
+    ${v.outdated ? `<div class="outdated">Estes cortes foram gerados por uma versão antiga, sem as novidades
+      (teaser, gancho, zoom dinâmico e final em loop). <button class="btn small primary" data-reanalyze>Reprocessar agora</button></div>` : ""}`;
 
   if (v.status === "error") {
     el.innerHTML = `${head}<div class="progress-card"><p><b>Falhou.</b></p>
@@ -227,6 +235,7 @@ $("#detail").addEventListener("click", async (e) => {
   if (e.target.closest("[data-open-folder]")) {
     api(`/videos/${v.id}/open-folder`, { method: "POST" }).catch((err) => toast(err.message, true));
   } else if (e.target.closest("[data-reanalyze]")) {
+    if (v.status === "ready" && !confirm("Refazer os cortes deste vídeo com a versão atual? As edições manuais destes cortes serão perdidas.")) return;
     try {
       await api(`/videos/${v.id}/reanalyze`, { method: "POST" });
       refresh();

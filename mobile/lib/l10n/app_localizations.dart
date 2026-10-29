@@ -352,6 +352,30 @@ abstract class AppLocalizations {
   /// **'Shorts'**
   String get shortsTitle;
 
+  /// No description provided for @reprocess.
+  ///
+  /// In pt, this message translates to:
+  /// **'Reprocessar'**
+  String get reprocess;
+
+  /// No description provided for @reprocessTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Reprocessar cortes?'**
+  String get reprocessTitle;
+
+  /// No description provided for @reprocessBody.
+  ///
+  /// In pt, this message translates to:
+  /// **'Os cortes deste vídeo serão gerados de novo com a versão atual (teaser, gancho, zoom e loop), sem precisar enviar o vídeo. Edições manuais nestes cortes serão perdidas.'**
+  String get reprocessBody;
+
+  /// No description provided for @outdatedBanner.
+  ///
+  /// In pt, this message translates to:
+  /// **'Estes cortes foram gerados por uma versão antiga, sem as novidades (teaser, gancho, zoom dinâmico e final em loop).'**
+  String get outdatedBanner;
+
   /// No description provided for @analyzingHint.
   ///
   /// In pt, this message translates to:

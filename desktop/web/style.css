@@ -109,6 +109,12 @@ button, input { font: inherit; color: inherit; }
 .detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
 .detail-head h2 { margin: 0; font-size: 20px; word-break: break-all; }
 .detail-head .meta { color: var(--muted); font-size: 13px; }
+.outdated {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: -6px 0 18px;
+  padding: 10px 14px; border-radius: 10px; font-size: 14px;
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+}
 .progress-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; max-width: 560px; }
 
 .groups { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
