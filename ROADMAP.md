@@ -45,6 +45,13 @@ Funcionando em produção:
 - A transcrição falhava com `open() got an unexpected keyword argument 'metadata_errors'`
   (ver tabela acima).
 
+- O CI do Windows falhava desde 24115d9 por três motivos: timeout de render no runner lento (os
+  testes de ponta a ponta agora esperam até 10 min); `PermissionError` ao ler e gravar o mesmo JSON
+  em paralelo (o store agora usa lock + novas tentativas, o que afetaria o uso no PC); e tempos
+  `numpy.float64` do Whisper real virando `numpy.bool_` no loop, que quebrava a análise com
+  "Object of type bool is not JSON serializable" (corrigido em 8533107, também no Railway).
+  As falhas dos testes do CI agora aparecem como anotações do GitHub.
+
 ### Feedback de performance (YouTube)
 
 | Data | Corte | Duração | Ficaram para assistir | Retenção média | Ajustes feitos |
