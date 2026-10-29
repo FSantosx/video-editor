@@ -57,7 +57,60 @@ passar de 60% de retenção média e manter "ficaram para assistir" acima de 60%
 
 ---
 
+## Meta do canal: monetização (YouTube Partner Program)
+
+Definida em 2026-10-29. Requisitos segundo fontes de mercado (air.io, vidIQ); **confirmar em
+YouTube Studio → Ganhar dinheiro**, porque os números mudam.
+
+| Etapa | Requisito | Prazo |
+|---|---|---|
+| **1. YPP inicial** (membros, Super Thanks, compras) | 500 inscritos + **3 milhões** de visualizações de Shorts em 90 dias + 3 uploads | **27/01/2027** |
+| **2. Anúncios** | 1.000 inscritos + **10 milhões** de visualizações de Shorts em 90 dias | Fontes indicam que sobe para **20 milhões a partir de 01/02/2027** |
+
+Contar **visualizações intencionais** (engaged views), não as visualizações totais.
+
+### Ponto de partida (corte postado em 28/10, primeiras 24h)
+
+| Métrica | Valor | Meta |
+|---|---|---|
+| Visualizações intencionais/dia | 592 (1.220 totais) | **33 mil/dia** |
+| Continuaram assistindo | 56,2% | ≥ 65% |
+| % assistida média | 65,2% (0:35) | ≥ 70% |
+| Inscritos | 1 a cada ~600 visualizações intencionais | manter |
+
+O gargalo é **volume de visualizações**: na taxa atual, 3 milhões de visualizações trariam
+inscritos de sobra. O ponto fraco da qualidade é o **início** (44% deslizam).
+
+### Plano
+
+- **Volume:** 2 a 3 Shorts por dia (cerca de 200 em 90 dias); média de 11 a 17 mil visualizações
+  intencionais por Short. De 1 a 2 vídeos-fonte por semana bastam, porque o pipeline gera até 8 cortes.
+- **Qualidade:** abrir na frase mais forte, com título curto na tela (gancho do 1º segundo);
+  cortes de ~38s; final conclusivo + chamada para comentar.
+- **Marcos (visualizações intencionais/dia):** semana 2 → 5 mil · semana 4 → 15 mil ·
+  semana 8 → 33 mil · semana 12 → 50 mil. Se ficar abaixo por 2 semanas seguidas, mudar o
+  tema ou a fonte dos cortes.
+- **Risco: conteúdo reutilizado.** Canais de cortes de terceiros são recusados no YPP se forem
+  só trechos copiados. Conseguir autorização das fontes, agregar valor (título com contexto,
+  comentário, edição própria) e variar as fontes.
+
+### Acompanhamento semanal
+
+| Semana | Shorts postados | Visualizações intencionais/dia | Continuaram (%) | Assistida (%) | Inscritos (total) |
+|---|---|---|---|---|---|
+| 0 (28/10) | 1 | 592 | 56,2 | 65,2 | 1 |
+
+---
+
 ## Próximas evoluções (por impacto)
+
+### 0. Gancho do primeiro segundo (ligado à meta: continuaram assistindo de 56% para ≥ 65%)
+
+**Onde:** `backend/app/pipeline/select.py` (peso do `hook`) e `captions.py` (título na tela).
+- Dar mais peso à primeira frase: pergunta, número, afirmação forte, nome conhecido.
+- Começar o corte exatamente na primeira palavra (sem respiro antes).
+- Título na tela curto (até ~6 palavras) e em destaque já no frame 0.
+- Validar comparando "continuaram assistindo" dos cortes antes e depois.
 
 ### 1. Seleção de trechos com LLM ⭐ maior ganho de qualidade
 
