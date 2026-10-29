@@ -97,8 +97,11 @@ def transcribe(wav: Path, source: Path, on_progress=None) -> tuple[list[dict], s
         for w in seg.words or []:
             text = w.word.strip()
             if text:
-                words.append({"word": text, "start": round(w.start, 3),
-                              "end": round(w.end, 3), "prob": round(w.probability, 3)})
+                # float(): o faster-whisper pode devolver numpy.float64, e comparações
+                # com ele viram numpy.bool_, que não vai para o JSON
+                words.append({"word": text, "start": round(float(w.start), 3),
+                              "end": round(float(w.end), 3),
+                              "prob": round(float(w.probability), 3)})
         if on_progress and info.duration:
             on_progress(min(seg.end / info.duration, 1.0))
     return words, info.language

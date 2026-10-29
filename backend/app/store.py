@@ -54,10 +54,18 @@ def _read(path: Path, default=None):
             return default
 
 
+def _json_default(value):
+    """Tipos numpy (numpy.float64, numpy.bool_...) que escapem do pipeline viram nativos."""
+    if hasattr(value, "item"):
+        return value.item()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
 def _write(path: Path, data) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
+    text = json.dumps(data, ensure_ascii=False, indent=1, default=_json_default)
     with _lock:
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+        tmp.write_text(text, encoding="utf-8")
         _retry(lambda: os.replace(tmp, path))  # atômico: nunca deixa JSON pela metade
 
 

@@ -99,7 +99,7 @@ def loop_possible(short: dict) -> bool:
         return False
     trial = {**short, "loop": {"enabled": True}}
     main = main_clips(trial)
-    return bool(main) and clips_duration(render_clips(trial)) >= config.LOOP_MIN_S
+    return bool(main) and bool(clips_duration(render_clips(trial)) >= config.LOOP_MIN_S)
 
 
 def apply_loop(short: dict, enabled: bool = config.LOOP_ENABLED) -> bool:

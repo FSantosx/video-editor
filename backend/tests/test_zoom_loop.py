@@ -93,3 +93,23 @@ def test_cta_moves_to_middle_in_loop():
     assert line.startswith("Dialogue: 1,0:00:18.00,0:00:21.00")  # 45% de 40s
     end = build_ass([], None, 0, cta="Comenta aí!", cta_seconds=3.0, total=40.0)
     assert "0:00:37.00,0:00:40.00" in end
+
+
+def test_numpy_times_from_whisper_do_not_break_json(tmp_path):
+    """O faster-whisper pode devolver tempos numpy.float64; o JSON do short precisa gravar."""
+    import json
+
+    import numpy as np
+
+    from app import store
+
+    words = [{**w, "start": np.float64(w["start"]), "end": np.float64(w["end"])}
+             for w in make_words(SCRIPT)]
+    cand = {"start": words[0]["start"], "end": words[-1]["end"], "title": "T", "score": 1, "text": ""}
+    s = build_short(1, cand, words, teaser=build_teaser(words, [], [cand], enabled=True))
+    assert type(apply_loop(s, True)) is bool
+    store._write(tmp_path / "s.json", [s])  # antes: TypeError numpy.bool_
+    assert json.loads((tmp_path / "s.json").read_text())[0]["loop"]["enabled"] is True
+    # e qualquer numpy que escape também é convertido
+    store._write(tmp_path / "n.json", {"b": np.bool_(True), "f": np.float64(1.5), "i": np.int64(2)})
+    assert store._read(tmp_path / "n.json") == {"b": True, "f": 1.5, "i": 2}
