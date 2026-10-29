@@ -64,6 +64,18 @@ jobs:
           . .\desktop\scripts\common.ps1
           $cfg = Set-AppEnvironment
           $work = Join-Path $env:RUNNER_TEMP "e2e"
+          # Em caso de erro: mensagem + fim do log do servidor como anotações do GitHub
+          trap {
+            Write-Host "::error::$_"
+            foreach ($f in @("server.err", "server.out")) {
+              $log = Join-Path $work $f
+              if (Test-Path $log) {
+                Get-Content $log -Tail 8 | Where-Object { $_.Trim() } |
+                  ForEach-Object { Write-Host "::error::[$f] $_" }
+              }
+            }
+            exit 1
+          }
           New-Item -ItemType Directory -Force $work | Out-Null
 
           # ~100s de fala com o sintetizador do Windows
