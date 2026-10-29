@@ -42,7 +42,7 @@ def client(tmp_path, monkeypatch):
         yield c
 
 
-def wait(client, vid, cond, timeout=120):
+def wait(client, vid, cond, timeout=600):  # runner Windows do CI é lento
     end = time.time() + timeout
     while time.time() < end:
         v = client.get(f"/videos/{vid}").json()
