@@ -32,14 +32,58 @@ def _output_offset(t: float, segments: list[dict]) -> float:
     return offset
 
 
+def _cut_offset(t: float, clips: list[dict]) -> float:
+    """Posição de t (tempo do original) no corte já editado (sem as pausas cortadas)."""
+    offset = 0.0
+    for c in clips:
+        if c["out"] <= t:
+            offset += c["out"] - c["in"]
+        elif c["in"] < t:
+            offset += t - c["in"]
+    return offset
+
+
+def _candidate_spans(ws: list[dict], max_s: float, include_tail: bool):
+    """Trechos de uma frase que podem virar teaser: (palavras, frase_inteira, é_final).
+
+    - frase inteira, se couber em max_s
+    - senão, o começo da frase até max_s (corte no meio da ideia gera curiosidade)
+    - no loop, também o FINAL da frase: o corte termina no meio dela e, ao recomeçar,
+      o teaser completa exatamente a frase (emenda perfeita)
+    """
+    if speech_duration(ws) <= max_s:
+        yield ws, True, False
+        return
+    head = []
+    for w in ws:
+        if w["end"] - ws[0]["start"] > max_s:
+            break
+        head.append(w)
+    yield head, False, False
+    if include_tail:
+        tail = []
+        for w in reversed(ws):
+            if ws[-1]["end"] - w["start"] > max_s:
+                break
+            tail.insert(0, w)
+        yield tail, True, True
+
+
 def pick_teaser(words: list[dict], energy: list[float], segments: list[dict],
                 max_s: float = config.TEASER_MAX_S,
-                earliest: float = EARLIEST_FRACTION) -> dict | None:
-    """Escolhe o trecho do teaser. Retorna {"start", "end", "text"} (tempo do original) ou None."""
+                earliest: float = EARLIEST_FRACTION,
+                loop_min_s: float | None = None) -> dict | None:
+    """Escolhe o trecho do teaser. Retorna {"start", "end", "text"} (tempo do original) ou None.
+
+    loop_min_s: só aceita teasers que, no final em loop, deixem o corte com pelo menos esse
+    tanto. A conta usa o tempo EDITADO (sem as pausas), igual à verificação do loop: no tempo
+    bruto a fala real tem 15-25% de pausas e o loop acabava recusado sem aviso.
+    """
     if not segments or not words:
         return None
     sentences, feats, sent_score, _ = score_sentences(words, energy)
     total = sum(g["end"] - g["start"] for g in segments)
+    cut_clips = [c for g in segments for c in build_clips(words_in(words, g["start"], g["end"]))]
 
     best, best_score = None, float("-inf")
     for s, f, score in zip(sentences, feats, sent_score):
@@ -48,24 +92,22 @@ def pick_teaser(words: list[dict], energy: list[float], segments: list[dict],
         if _output_offset(s["start"], segments) < earliest * total:
             continue
         ws = words[s["word_idx"][0]: s["word_idx"][1]]
-        if speech_duration(ws) <= max_s:
-            span, complete = ws, True
-        else:
-            span = []  # começo da frase até max_s (corte que gera curiosidade)
-            for w in ws:
-                if w["end"] - ws[0]["start"] > max_s:
-                    break
-                span.append(w)
-            complete = False
-        if not span or span[-1]["end"] - span[0]["start"] < TEASER_MIN_S:
-            continue
-        joined = " ".join(_norm(w["word"]) for w in span)
-        bonus = (0.6 * f["exclaim"] + 0.3 * f["question"] + 0.3 * complete
-                 + 0.5 * any(f" {c} " in f" {joined} " for c in CONCLUSIVE))
-        if score + bonus > best_score:
-            best_score = score + bonus
-            best = {"start": span[0]["start"], "end": span[-1]["end"],
-                    "text": " ".join(w["word"] for w in span)}
+        for span, complete, tail in _candidate_spans(ws, max_s, include_tail=loop_min_s is not None):
+            if not span or span[-1]["end"] - span[0]["start"] < TEASER_MIN_S:
+                continue
+            if loop_min_s is not None:
+                # corte no loop = tudo antes do teaser (editado) + o próprio teaser
+                teaser_len = clips_duration(build_clips(span))
+                if _cut_offset(span[0]["start"], cut_clips) + teaser_len < loop_min_s + 0.3:
+                    continue
+            joined = " ".join(_norm(w["word"]) for w in span)
+            bonus = (0.6 * f["exclaim"] + 0.3 * f["question"] + 0.3 * complete
+                     + 0.5 * any(f" {c} " in f" {joined} " for c in CONCLUSIVE)
+                     - 0.2 * tail)  # leve preferência por frase inteira / começo de frase
+            if score + bonus > best_score:
+                best_score = score + bonus
+                best = {"start": span[0]["start"], "end": span[-1]["end"],
+                        "text": " ".join(w["word"] for w in span)}
     return best
 
 
@@ -79,11 +121,10 @@ def build_teaser(words: list[dict], energy: list[float], segments: list[dict],
     """
     found = None
     if for_loop:
-        # No loop o corte termina no teaser: ele precisa vir depois de LOOP_MIN_S de fala
-        total = sum(g["end"] - g["start"] for g in segments)
-        need = (config.LOOP_MIN_S - config.TEASER_MAX_S) / total if total else 1.0
-        found = pick_teaser(words, energy, segments,
-                            earliest=max(config.LOOP_TEASER_FROM, need))
+        # No loop o corte termina no teaser: ele vem do fim do trecho e precisa deixar o
+        # corte (editado) com pelo menos LOOP_MIN_S
+        found = pick_teaser(words, energy, segments, earliest=config.LOOP_TEASER_FROM,
+                            loop_min_s=config.LOOP_MIN_S)
     if not found:  # sem loop (ou nenhuma frase boa no fim): teaser normal
         found = pick_teaser(words, energy, segments, earliest=EARLIEST_FRACTION)
     if not found:
@@ -106,5 +147,10 @@ def apply_loop(short: dict, enabled: bool = config.LOOP_ENABLED) -> bool:
     """Liga/desliga o final em loop. Retorna se ficou ligado."""
     on = enabled and loop_possible(short)
     short["loop"] = {"enabled": on}
+    if enabled and not on:  # explica na interface por que ficou desligado
+        teaser = short.get("teaser") or {}
+        short["loop"]["reason"] = (
+            "sem teaser neste corte" if not (teaser.get("enabled") and teaser.get("clips"))
+            else f"o corte ficaria com menos de {config.LOOP_MIN_S:.0f}s")
     update_duration(short)
     return on

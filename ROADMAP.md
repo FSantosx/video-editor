@@ -58,6 +58,12 @@ Funcionando em produção:
   app e o PC mostram um aviso com o botão **Reprocessar** (refaz seleção e cortes sem transcrever
   de novo).
 
+- O loop era recusado sem aviso em ~40% dos cortes de fala real: o teaser era escolhido no
+  tempo bruto (com pausas) e a duração mínima do loop, conferida no tempo editado (pausas
+  cortadas). Agora a escolha usa o tempo editado e, em corte curto, aceita o final da última
+  frase como teaser (o loop completa a frase). Com pausas realistas, o loop liga em ~90% dos
+  cortes (antes ~60%); quando não liga, o motivo aparece no editor (`loop.reason`).
+
 ### Feedback de performance (YouTube)
 
 | Data | Corte | Duração | Ficaram para assistir | Retenção média | Ajustes feitos |

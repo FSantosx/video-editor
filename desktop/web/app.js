@@ -223,6 +223,11 @@ function renderGroup(v, shorts) {
   }).join("");
   return `<article class="group">
     <div class="group-head"><h3>${esc(main.title)}</h3><span class="score" title="Nota da seleção">🔥 ${main.score}</span></div>
+    <div class="fx-chips">${[
+      main.teaser?.enabled && "teaser",
+      main.zoom?.enabled && "zoom",
+      main.loop?.enabled ? "⟲ loop" : (main.loop?.reason ? `sem loop: ${main.loop.reason}` : null),
+    ].filter(Boolean).map((t) => `<span class="fx">${esc(t)}</span>`).join("")}</div>
     ${main.hook ? `<span class="hook-chip" title="Gancho na tela${main.titles_source === "llm" ? " (escrito pelo Claude)" : ""}">${esc(main.hook)}</span>` : ""}
     <div class="formats">${formats}</div>
     <div class="group-actions"><button class="btn small" data-edit="${main.id}">Editar</button></div>
@@ -283,6 +288,7 @@ function openEditor(video, shortId) {
   f.cta.checked = Boolean(short.cta?.enabled);
   f.teaser.checked = Boolean(short.teaser?.enabled);
   f.loop.checked = Boolean(short.loop?.enabled);
+  $("#o-loop").textContent = short.loop?.reason ? `Desligado: ${short.loop.reason}.` : "";
   f.zoom.checked = Boolean(short.zoom?.enabled);
   $("#o-teaser").textContent = short.teaser?.text ? `“${short.teaser.text}”` : "";
   f.ctaText.value = short.cta?.text ?? "";

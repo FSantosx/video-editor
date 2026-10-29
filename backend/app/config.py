@@ -72,8 +72,8 @@ CLAUDE_EFFORT = os.getenv("CLAUDE_EFFORT", "medium")
 # Vídeos processados com versão menor aparecem como "desatualizados" e podem ser
 # reprocessados (sem transcrever de novo).
 # 1 = MVP · 2 = retenção (38s, final conclusivo, chamada) · 3 = teaser · 4 = gancho
-# 5 = zoom dinâmico + final em loop
-PIPELINE_VERSION = 5
+# 5 = zoom dinâmico + final em loop · 6 = loop no tempo editado (liga em ~90% dos cortes)
+PIPELINE_VERSION = 6
 
 # Formatos gerados para cada trecho escolhido (largura x altura da saída)
 FORMAT_SIZES = {"9:16": (1080, 1920), "1:1": (1080, 1080)}

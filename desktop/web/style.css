@@ -184,6 +184,11 @@ legend { font-size: 13px; font-weight: 600; padding: 0 4px; }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }
 .teaser-text { margin: 2px 0 0 24px; }
 #f-hook { text-transform: uppercase; font-weight: 700; }
+.fx-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.fx {
+  font-size: 11px; padding: 2px 7px; border-radius: 999px; color: var(--muted);
+  background: var(--panel-2); border: 1px solid var(--border);
+}
 .hook-chip {
   align-self: flex-start; background: var(--accent); color: var(--accent-text);
   font-size: 12px; font-weight: 800; padding: 3px 8px; border-radius: 6px; letter-spacing: .02em;

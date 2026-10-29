@@ -113,3 +113,50 @@ def test_numpy_times_from_whisper_do_not_break_json(tmp_path):
     # e qualquer numpy que escape também é convertido
     store._write(tmp_path / "n.json", {"b": np.bool_(True), "f": np.float64(1.5), "i": np.int64(2)})
     assert store._read(tmp_path / "n.json") == {"b": True, "f": 1.5, "i": 2}
+
+
+def _realistic_words(n_sentences=120, seed=1):
+    """Fala com pausas reais (hesitações e respiros), como no Whisper de um vídeo de verdade."""
+    import random
+    rnd = random.Random(seed)
+    vocab = ("o problema da campanha foi a gente não ouvir as pessoas na rua e isso custou caro "
+             "eu aprendi que dinheiro sozinho não ganha eleição você precisa de verdade").split()
+    words, t = [], 0.5
+    for _ in range(n_sentences):
+        n = rnd.randint(7, 16)
+        for k in range(n):
+            w = rnd.choice(vocab) + (rnd.choice([".", ".", "!", "?"]) if k == n - 1 else "")
+            d = rnd.uniform(0.18, 0.45)
+            words.append({"word": w, "start": round(t, 3), "end": round(t + d, 3)})
+            t += d + (rnd.uniform(0.3, 0.9) if rnd.random() < 0.18 else rnd.uniform(0.02, 0.12))
+        t += rnd.uniform(0.4, 1.4)
+    return words
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_loop_engages_on_speech_with_real_pauses(seed):
+    """Regressão: o teaser era escolhido no tempo bruto (com pausas) e o loop, verificado no
+    tempo editado; em fala real o loop era recusado em ~40% dos cortes, sem aviso."""
+    from app.pipeline.select import select_shorts
+    words = _realistic_words(seed=seed)
+    cands = select_shorts(words, [], target_s=config.SHORT_TARGET_S + 4, max_shorts=8)
+    looped = 0
+    for c in cands:
+        s = build_short(1, c, words, teaser=build_teaser(words, [], c.get("segments") or [c]))
+        if apply_loop(s, True):
+            looped += 1
+            assert s["duration"] >= config.LOOP_MIN_S
+        else:
+            assert s["loop"]["reason"]  # motivo visível na interface
+    assert looped >= 0.85 * len(cands), f"{looped}/{len(cands)}"
+
+
+def test_loop_teaser_can_be_the_end_of_a_sentence():
+    """Corte curto: o teaser vira o final da última frase (o loop completa a frase)."""
+    long_last = ("E foi exatamente nesse dia que eu entendi que a campanha inteira "
+                 "estava errada desde o começo!")
+    words = make_words([(f"Esta é a frase número {i} da história.", 0.6) for i in range(9)]
+                       + [(long_last, 0.6)])
+    seg = [{"start": words[0]["start"], "end": words[-1]["end"]}]
+    teaser = build_teaser(words, [], seg, for_loop=True)
+    assert long_last.endswith(teaser["text"]) and teaser["text"] != long_last
