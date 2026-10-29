@@ -215,6 +215,7 @@ function renderGroup(v, shorts) {
   }).join("");
   return `<article class="group">
     <div class="group-head"><h3>${esc(main.title)}</h3><span class="score" title="Nota da seleção">🔥 ${main.score}</span></div>
+    ${main.hook ? `<span class="hook-chip" title="Gancho na tela${main.titles_source === "llm" ? " (escrito pelo Claude)" : ""}">${esc(main.hook)}</span>` : ""}
     <div class="formats">${formats}</div>
     <div class="group-actions"><button class="btn small" data-edit="${main.id}">Editar</button></div>
   </article>`;
@@ -238,6 +239,7 @@ $("#detail").addEventListener("click", async (e) => {
 // ---------- editor ----------
 const editor = $("#editor");
 const f = {
+  hook: $("#f-hook"),
   title: $("#f-title"), start: $("#f-start"), end: $("#f-end"), captions: $("#f-captions"),
   titleOverlay: $("#f-title-overlay"), auto: $("#f-auto"), crop: $("#f-crop"), sync: $("#f-sync"),
   cta: $("#f-cta"), ctaText: $("#f-cta-text"), teaser: $("#f-teaser"),
@@ -263,6 +265,7 @@ function openEditor(video, shortId) {
   const max = Math.min(duration, short.window.end + WINDOW_SLACK);
   for (const input of [f.start, f.end]) { input.min = min; input.max = max; }
   f.title.value = short.title;
+  f.hook.value = short.hook ?? "";
   f.start.value = short.window.start;
   f.end.value = short.window.end;
   f.captions.checked = short.captions.enabled;
@@ -311,6 +314,8 @@ $("#editor-form").addEventListener("submit", async (e) => {
   const short = group.find((s) => s.id === shortId);
   const patch = {};
   if (f.title.value.trim() !== short.title) patch.title = f.title.value.trim();
+  const hook = f.hook.value.trim().replace(/\s+/g, " ").toUpperCase();
+  if (hook !== (short.hook ?? "")) patch.hook = hook;
   const start = Number(f.start.value), end = Number(f.end.value);
   if (Math.abs(start - short.window.start) > 0.05 || Math.abs(end - short.window.end) > 0.05) {
     patch.start = Math.round(start * 100) / 100;

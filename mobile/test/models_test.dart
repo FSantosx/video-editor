@@ -74,6 +74,11 @@ void main() {
       expect(draft.diff(short).toJson(), {'teaser': true});
     });
 
+    test('gancho vai normalizado em maiúsculas', () {
+      final draft = ShortDraft.fromShort(short).copyWith(hook: '  o erro   que custou ');
+      expect(draft.diff(short).toJson(), {'hook': 'O ERRO QUE CUSTOU'});
+    });
+
     test('voltar ao enquadramento automático', () {
       final draft = ShortDraft.fromShort(short).copyWith(autoReframe: true);
       expect(draft.diff(short).toJson(), {'auto_reframe': true});

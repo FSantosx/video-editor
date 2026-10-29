@@ -2,6 +2,8 @@ fastapi==0.162.0
 uvicorn[standard]==0.54.0
 python-multipart==0.0.32
 faster-whisper==1.2.1
+# títulos de gancho com o Claude (opcional: só é usado com ANTHROPIC_API_KEY)
+anthropic==2.3.0
 numpy==2.5.4
 # 4.x: o OpenCV 5 removeu o CascadeClassifier (detector de rosto usado no reenquadramento)
 opencv-python-headless==4.14.0.94

@@ -64,6 +64,7 @@ class Short {
   const Short({
     required this.id,
     required this.title,
+    required this.hook,
     required this.score,
     required this.text,
     required this.windowStart,
@@ -90,6 +91,7 @@ class Short {
     return Short(
       id: json['id'] as int,
       title: json['title'] as String,
+      hook: json['hook'] as String? ?? '',
       score: json['score'] as int? ?? 0,
       text: json['text'] as String? ?? '',
       windowStart: _toDouble(window['start']),
@@ -110,6 +112,9 @@ class Short {
 
   final int id;
   final String title;
+
+  /// Texto curto de gancho na tela (vazio = mostra o título)
+  final String hook;
   final int score;
   final String text;
   final double windowStart;
@@ -186,6 +191,7 @@ class Video {
 class ShortPatch {
   const ShortPatch({
     this.title,
+    this.hook,
     this.start,
     this.end,
     this.captions,
@@ -198,6 +204,7 @@ class ShortPatch {
   });
 
   final String? title;
+  final String? hook;
   final double? start;
   final double? end;
   final bool? captions;
@@ -210,6 +217,7 @@ class ShortPatch {
 
   Map<String, dynamic> toJson() => {
         if (title != null) 'title': title,
+        if (hook != null) 'hook': hook,
         if (start != null) 'start': start,
         if (end != null) 'end': end,
         if (captions != null) 'captions': captions,

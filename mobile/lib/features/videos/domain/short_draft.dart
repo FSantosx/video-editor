@@ -9,6 +9,7 @@ const windowSlack = 30.0;
 class ShortDraft {
   const ShortDraft({
     required this.title,
+    required this.hook,
     required this.start,
     required this.end,
     required this.captions,
@@ -22,6 +23,7 @@ class ShortDraft {
 
   factory ShortDraft.fromShort(Short s) => ShortDraft(
         title: s.title,
+        hook: s.hook,
         start: s.windowStart,
         end: s.windowEnd,
         captions: s.captions,
@@ -34,6 +36,7 @@ class ShortDraft {
       );
 
   final String title;
+  final String hook;
   final double start;
   final double end;
   final bool captions;
@@ -46,6 +49,7 @@ class ShortDraft {
 
   ShortDraft copyWith({
     String? title,
+    String? hook,
     double? start,
     double? end,
     bool? captions,
@@ -58,6 +62,7 @@ class ShortDraft {
   }) =>
       ShortDraft(
         title: title ?? this.title,
+        hook: hook ?? this.hook,
         start: start ?? this.start,
         end: end ?? this.end,
         captions: captions ?? this.captions,
@@ -78,6 +83,7 @@ class ShortDraft {
         (!autoReframe && (cropCenter - base.cropCenter).abs() > 0.005);
     return ShortPatch(
       title: title.trim() != base.title ? title.trim() : null,
+      hook: normalizeHook(hook) != base.hook ? normalizeHook(hook) : null,
       start: windowChanged ? _round(start) : null,
       end: windowChanged ? _round(end) : null,
       captions: captions != base.captions ? captions : null,
@@ -93,6 +99,9 @@ class ShortDraft {
   }
 
   static double _round(double v) => (v * 100).round() / 100;
+
+  /// Mesmo formato que o servidor grava: espaços simples e maiúsculas.
+  static String normalizeHook(String v) => v.trim().split(RegExp(r'\s+')).join(' ').toUpperCase();
 }
 
 /// Limites do RangeSlider: o trecho atual com folga, dentro do vídeo.

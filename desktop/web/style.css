@@ -177,6 +177,11 @@ legend { font-size: 13px; font-weight: 600; padding: 0 4px; }
 .check { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }
 .teaser-text { margin: 2px 0 0 24px; }
+#f-hook { text-transform: uppercase; font-weight: 700; }
+.hook-chip {
+  align-self: flex-start; background: var(--accent); color: var(--accent-text);
+  font-size: 12px; font-weight: 800; padding: 3px 8px; border-radius: 6px; letter-spacing: .02em;
+}
 .teaser-text:empty { display: none; }
 .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 .transcript { font-size: 13px; color: var(--muted); }

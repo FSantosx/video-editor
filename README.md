@@ -70,6 +70,8 @@ Testes: `python -m pytest -q`
    e o `railway.json` dessa pasta.
 3. Em **Variables**, defina:
    - `API_KEY`: uma senha longa, que você também coloca no app. **Obrigatória**, senão a API fica aberta.
+   - Recomendada: `ANTHROPIC_API_KEY`, para o Claude escrever os títulos de gancho
+     (console.anthropic.com). Sem ela, uma heurística monta os ganchos.
    - Opcionais: `WHISPER_MODEL` (`base` por padrão; `small` transcreve melhor e é cerca de 3x mais lento),
      `MAX_SHORTS` (5), `SHORT_MIN_S` (30), `SHORT_MAX_S` (60), `WORKERS` (1).
 4. Clique com o botão direito no serviço → **Attach Volume**, com mount path `/data`.

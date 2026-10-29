@@ -113,6 +113,16 @@ teaser + corte. Liga e desliga com `TEASER_ENABLED`, no PATCH `teaser`, no PC e 
 de duração desconta o teaser. **Medir:** "continuaram assistindo" dos cortes com teaser
 contra os 56,2% de 28/10.
 
+### ✅ Título de gancho (feito em 2026-10-29)
+
+Texto curto (até 6 palavras, caixa vermelha) no topo, desde o frame 0, sobre o teaser, e um título
+de post melhor. `backend/app/pipeline/titles.py`: com `ANTHROPIC_API_KEY`, o Claude
+(`CLAUDE_MODEL`, padrão `claude-opus-5-5`) escreve os ganchos e títulos de todos os cortes do vídeo
+numa única chamada com saída JSON estruturada e fallback de recusa no servidor; sem chave, ou se a
+API falhar, uma heurística usa uma das primeiras frases com palavra de gancho ou número (evitando a
+frase do teaser, que já está legendada). JSON `hook` e `titles_source` (`llm`/`heuristic`); editável
+no PATCH `hook`, no PC e no app. **Medir:** "continuaram assistindo" com gancho contra sem gancho.
+
 ### 0. Gancho do primeiro segundo (ligado à meta: continuaram assistindo de 56% para ≥ 65%)
 
 **Onde:** `backend/app/pipeline/select.py` (peso do `hook`) e `captions.py` (título na tela).

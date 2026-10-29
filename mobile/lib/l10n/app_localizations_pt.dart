@@ -166,7 +166,13 @@ class AppLocalizationsPt extends AppLocalizations {
   String get savedRerendering => 'Salvo! Gerando a nova versão…';
 
   @override
-  String get title => 'Título';
+  String get title => 'Título do post';
+
+  @override
+  String get hook => 'Gancho (texto na tela)';
+
+  @override
+  String get hookHint => 'Até 6 palavras. Aparece no início do vídeo.';
 
   @override
   String trimLabel(String start, String end) {

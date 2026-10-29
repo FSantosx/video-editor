@@ -49,6 +49,12 @@ TEASER_ENABLED = os.getenv("TEASER_ENABLED", "1") == "1"
 TEASER_MAX_S = _env_float("TEASER_MAX_S", 3.5)
 TEASER_ZOOM = _env_float("TEASER_ZOOM", 1.08)  # leve zoom para marcar que é uma prévia
 
+# Título de gancho (texto na tela) e título do post. auto = Claude se houver
+# ANTHROPIC_API_KEY, senão heurística; llm = sempre tenta o Claude; heuristic = nunca usa
+TITLES_ENGINE = os.getenv("TITLES_ENGINE", "auto")
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-5-5")
+CLAUDE_EFFORT = os.getenv("CLAUDE_EFFORT", "medium")
+
 # Formatos gerados para cada trecho escolhido (largura x altura da saída)
 FORMAT_SIZES = {"9:16": (1080, 1920), "1:1": (1080, 1080)}
 FORMATS = [f.strip() for f in os.getenv("FORMATS", "9:16").split(",") if f.strip()]

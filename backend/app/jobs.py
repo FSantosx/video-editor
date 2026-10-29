@@ -8,11 +8,13 @@ import logging
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from . import config, store
 from .pipeline import media
 from .pipeline.edit import build_short, render_clips
 from .pipeline.teaser import build_teaser
+from .pipeline.titles import generate_titles
 from .pipeline.reframe import compute_reframe
 from .pipeline.render import render_short
 from .pipeline.select import select_shorts
@@ -89,10 +91,18 @@ def analyze_video(vid: str) -> None:
     # O teaser soma até TEASER_MAX_S à duração: desconta do alvo para o total ficar perto dele
     target = config.SHORT_TARGET_S - (0.8 * config.TEASER_MAX_S if config.TEASER_ENABLED else 0)
     candidates = select_shorts(words, analysis["energy"], target_s=target)
+    teasers = [build_teaser(words, analysis["energy"], c.get("segments") or [c])
+               for c in candidates]
+    # Títulos de gancho (Claude se houver chave; senão heurística), uma chamada por vídeo
+    video = store.get_video(vid)
+    titles = generate_titles(
+        [{"text": c["text"], "teaser": t["text"] or None} for c, t in zip(candidates, teasers)],
+        context=Path(video["filename"]).stem.replace("_", " "))
+    for cand, t in zip(candidates, titles):
+        cand.update(title=t["title"], hook=t["hook"], titles_source=t["source"])
     # Um short por formato para cada trecho; o group liga as versões do mesmo trecho
     shorts, next_id = [], 1
-    for group, cand in enumerate(candidates, start=1):
-        teaser = build_teaser(words, analysis["energy"], cand.get("segments") or [cand])
+    for group, (cand, teaser) in enumerate(zip(candidates, teasers), start=1):
         for fmt in config.FORMATS:
             shorts.append(build_short(next_id, cand, words, fmt=fmt, group=group, teaser=teaser))
             next_id += 1

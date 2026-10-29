@@ -58,19 +58,21 @@ class _EditorState extends ConsumerState<_Editor> {
   late ShortDraft _draft = ShortDraft.fromShort(widget.short);
   late final _title = TextEditingController(text: widget.short.title);
   late final _ctaText = TextEditingController(text: widget.short.ctaText);
+  late final _hook = TextEditingController(text: widget.short.hook);
   bool _saving = false;
 
   @override
   void dispose() {
     _title.dispose();
     _ctaText.dispose();
+    _hook.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     final l10n = context.l10n;
     final messenger = ScaffoldMessenger.of(context);
-    final patch = _draft.copyWith(title: _title.text, ctaText: _ctaText.text).diff(widget.short);
+    final patch = _draft.copyWith(title: _title.text, ctaText: _ctaText.text, hook: _hook.text).diff(widget.short);
     if (patch.isEmpty) return;
     setState(() => _saving = true);
     final result = await ref.read(videosRepositoryProvider)!.patchShort(widget.video.id, widget.short.id, patch);
@@ -93,7 +95,7 @@ class _EditorState extends ConsumerState<_Editor> {
     final repo = ref.watch(videosRepositoryProvider)!;
     final meta = widget.video.meta;
     final bounds = windowBounds(short, meta?.duration ?? short.windowEnd);
-    final hasChanges = !_draft.copyWith(title: _title.text, ctaText: _ctaText.text).diff(short).isEmpty;
+    final hasChanges = !_draft.copyWith(title: _title.text, ctaText: _ctaText.text, hook: _hook.text).diff(short).isEmpty;
     final busy = short.render.isWorking;
 
     return ListView(
@@ -118,6 +120,18 @@ class _EditorState extends ConsumerState<_Editor> {
           ),
         if (busy) LinearProgressIndicator(value: short.render.progress > 0 ? short.render.progress : null),
         const SizedBox(height: 16),
+        TextField(
+          controller: _hook,
+          maxLength: 60,
+          textCapitalization: TextCapitalization.characters,
+          decoration: InputDecoration(
+            labelText: l10n.hook,
+            helperText: l10n.hookHint,
+            border: const OutlineInputBorder(),
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 8),
         TextField(
           controller: _title,
           maxLength: 120,

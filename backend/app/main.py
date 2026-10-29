@@ -131,6 +131,8 @@ def reanalyze(vid: str):
 
 class ShortPatch(BaseModel):
     title: str | None = Field(None, max_length=120)
+    # texto de gancho na tela (vazio = mostra o título)
+    hook: str | None = Field(None, max_length=60)
     start: float | None = Field(None, ge=0)
     end: float | None = Field(None, gt=0)
     captions: bool | None = None
@@ -183,6 +185,8 @@ def patch_short(vid: str, sid: int, patch: ShortPatch):
         update_duration(s)
         if patch.title is not None:
             s["title"] = patch.title.strip()
+        if patch.hook is not None:
+            s["hook"] = " ".join(patch.hook.split()).upper()
         if patch.captions is not None:
             s["captions"]["enabled"] = patch.captions
         if patch.title_overlay is not None:

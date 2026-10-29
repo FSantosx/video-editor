@@ -57,7 +57,9 @@
 
   "editShort": "Editar short",
   "savedRerendering": "Salvo! Gerando a nova versão…",
-  "title": "Título",
+  "title": "Título do post",
+  "hook": "Gancho (texto na tela)",
+  "hookHint": "Até 6 palavras. Aparece no início do vídeo.",
   "trimLabel": "Trecho: {start} – {end}",
   "@trimLabel": { "placeholders": { "start": { "type": "String" }, "end": { "type": "String" } } },
   "trimHint": "Pausas longas dentro do trecho são cortadas automaticamente.",

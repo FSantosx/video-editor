@@ -373,8 +373,20 @@ abstract class AppLocalizations {
   /// No description provided for @title.
   ///
   /// In pt, this message translates to:
-  /// **'Título'**
+  /// **'Título do post'**
   String get title;
+
+  /// No description provided for @hook.
+  ///
+  /// In pt, this message translates to:
+  /// **'Gancho (texto na tela)'**
+  String get hook;
+
+  /// No description provided for @hookHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Até 6 palavras. Aparece no início do vídeo.'**
+  String get hookHint;
 
   /// No description provided for @trimLabel.
   ///
