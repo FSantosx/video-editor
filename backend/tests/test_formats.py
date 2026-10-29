@@ -145,3 +145,27 @@ def test_reframe_falls_back_to_ffmpeg_when_opencv_cannot_open(tmp_path, monkeypa
     result = reframe.compute_reframe(video, [{"in": 0.5, "out": 2.5}], 640, 360)
     assert calls and calls[0] == (360, 640, 3)  # frames chegaram via ffmpeg
     assert result["mode"] == "blur"  # testsrc não tem rosto
+
+
+def test_teaser_toggle_via_patch(client):
+    with open(client.video_path, "rb") as f:
+        vid = client.post("/videos", files={"file": ("in.mp4", f, "video/mp4")}).json()["id"]
+    v = wait_done(client, vid)
+    s = v["shorts"][0]
+    assert s["teaser"]["enabled"] and s["teaser"]["clips"]
+    with_teaser = s["duration"]
+    teaser_len = sum(c["out"] - c["in"] for c in s["teaser"]["clips"])
+
+    r = client.patch(f"/videos/{vid}/shorts/{s['id']}", json={"teaser": False, "sync_group": True})
+    assert r.status_code == 200
+    v = wait_done(client, vid, version=2)
+    for short in v["shorts"]:
+        assert not short["teaser"]["enabled"]
+        assert abs(short["duration"] - (with_teaser - teaser_len)) < 0.01
+        if short["reframe"]["mode"] == "crop":  # um centro por clip renderizado
+            assert len(short["reframe"]["centers"]) == len(short["clips"])
+    shorts_dir = client.store.video_dir(vid) / "shorts"
+    real = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                 "-of", "csv=p=0", str(shorts_dir / v["shorts"][0]["render"]["file"])],
+                                capture_output=True, text=True).stdout)
+    assert abs(real - v["shorts"][0]["duration"]) < 0.6

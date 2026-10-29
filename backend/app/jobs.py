@@ -11,7 +11,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import config, store
 from .pipeline import media
-from .pipeline.edit import build_short
+from .pipeline.edit import build_short, render_clips
+from .pipeline.teaser import build_teaser
 from .pipeline.reframe import compute_reframe
 from .pipeline.render import render_short
 from .pipeline.select import select_shorts
@@ -85,12 +86,15 @@ def analyze_video(vid: str) -> None:
 
     _progress(vid, "select")
     words = analysis["words"]
-    candidates = select_shorts(words, analysis["energy"])
+    # O teaser soma até TEASER_MAX_S à duração: desconta do alvo para o total ficar perto dele
+    target = config.SHORT_TARGET_S - (0.8 * config.TEASER_MAX_S if config.TEASER_ENABLED else 0)
+    candidates = select_shorts(words, analysis["energy"], target_s=target)
     # Um short por formato para cada trecho; o group liga as versões do mesmo trecho
     shorts, next_id = [], 1
     for group, cand in enumerate(candidates, start=1):
+        teaser = build_teaser(words, analysis["energy"], cand.get("segments") or [cand])
         for fmt in config.FORMATS:
-            shorts.append(build_short(next_id, cand, words, fmt=fmt, group=group))
+            shorts.append(build_short(next_id, cand, words, fmt=fmt, group=group, teaser=teaser))
             next_id += 1
     store.save_shorts(vid, shorts)
     store.update_video(vid, status="ready", step=None, progress=1.0,
@@ -120,7 +124,7 @@ def render(vid: str, sid: int) -> None:
     set_status(status="rendering", progress=0.0)
     if short["reframe"]["mode"] == "auto":
         reframe = _sibling_reframe(vid, short, meta) or compute_reframe(
-            src, short["clips"], meta["width"], meta["height"], target_aspect=_aspect(short))
+            src, render_clips(short), meta["width"], meta["height"], target_aspect=_aspect(short))
         store.update_short(vid, sid, lambda s: s.update(reframe=reframe))
         short["reframe"] = reframe
 
@@ -155,7 +159,7 @@ def _sibling_reframe(vid: str, short: dict, meta: dict) -> dict | None:
         return None
     for other in store.get_shorts(vid):
         if (other["id"] != short["id"] and other.get("group") == short.get("group")
-                and other["clips"] == short["clips"] and src_aspect > _aspect(other)
+                and render_clips(other) == render_clips(short) and src_aspect > _aspect(other)
                 and other["reframe"]["mode"] in ("crop", "blur")):
             return {"mode": other["reframe"]["mode"], "centers": list(other["reframe"]["centers"])}
     return None

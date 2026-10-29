@@ -17,6 +17,7 @@ class ShortDraft {
     required this.cropCenter,
     required this.cta,
     required this.ctaText,
+    required this.teaser,
   });
 
   factory ShortDraft.fromShort(Short s) => ShortDraft(
@@ -29,6 +30,7 @@ class ShortDraft {
         cropCenter: s.cropCenter ?? 0.5,
         cta: s.cta,
         ctaText: s.ctaText,
+        teaser: s.teaser,
       );
 
   final String title;
@@ -40,6 +42,7 @@ class ShortDraft {
   final double cropCenter;
   final bool cta;
   final String ctaText;
+  final bool teaser;
 
   ShortDraft copyWith({
     String? title,
@@ -51,6 +54,7 @@ class ShortDraft {
     double? cropCenter,
     bool? cta,
     String? ctaText,
+    bool? teaser,
   }) =>
       ShortDraft(
         title: title ?? this.title,
@@ -62,6 +66,7 @@ class ShortDraft {
         cropCenter: cropCenter ?? this.cropCenter,
         cta: cta ?? this.cta,
         ctaText: ctaText ?? this.ctaText,
+        teaser: teaser ?? this.teaser,
       );
 
   double get length => end - start;
@@ -83,6 +88,7 @@ class ShortDraft {
       ctaText: cta && ctaText.trim().isNotEmpty && ctaText.trim() != base.ctaText
           ? ctaText.trim()
           : null,
+      teaser: teaser != base.teaser ? teaser : null,
     );
   }
 

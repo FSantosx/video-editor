@@ -63,6 +63,8 @@
   "trimHint": "Pausas longas dentro do trecho são cortadas automaticamente.",
   "captions": "Legendas animadas",
   "titleOverlay": "Título nos primeiros segundos",
+  "teaser": "Abertura com teaser",
+  "teaserHint": "Começa com o momento mais forte e volta ao início",
   "cta": "Chamada no final",
   "ctaHint": "Pede para comentar nos últimos segundos",
   "ctaText": "Texto da chamada",

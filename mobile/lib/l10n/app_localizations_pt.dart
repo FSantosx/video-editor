@@ -184,6 +184,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get titleOverlay => 'Título nos primeiros segundos';
 
   @override
+  String get teaser => 'Abertura com teaser';
+
+  @override
+  String get teaserHint => 'Começa com o momento mais forte e volta ao início';
+
+  @override
   String get cta => 'Chamada no final';
 
   @override

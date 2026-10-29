@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .. import config
 from .captions import build_ass
-from .edit import map_words_to_output
+from .edit import map_words_to_output, render_clips, teaser_clips
 from .media import FFmpegError, run
 
 log = logging.getLogger("render")
@@ -40,9 +40,12 @@ def crop_box(sw: int, sh: int, out_w: int, out_h: int, center_x: float) -> tuple
     return cw, ch, 0, y
 
 
-def _video_chain(i: int, short: dict, meta: dict, clip_idx: int) -> str:
+def _video_chain(i: int, short: dict, meta: dict, clip_idx: int, zoom: float = 1.0) -> str:
     W, H = out_size(short)
     tail = f"setsar=1,fps={config.OUT_FPS},format=yuv420p,setpts=PTS-STARTPTS[v{i}]"
+    if zoom > 1.0:  # teaser: leve zoom central para marcar que é uma prévia
+        zw, zh = _even(W * zoom), _even(H * zoom)
+        tail = f"scale={zw}:{zh},crop={W}:{H}," + tail
     mode = short["reframe"]["mode"]
 
     if mode == "crop":
@@ -89,7 +92,8 @@ def _codec_args() -> list[str]:
 
 def build_command(source: Path, short: dict, meta: dict, ass_name: str | None,
                   out_path: Path) -> list[str]:
-    clips = short["clips"]
+    clips = render_clips(short)
+    n_teaser = len(teaser_clips(short))
     cmd = ["ffmpeg", "-y", "-hide_banner", "-v", "error", "-progress", "pipe:1", "-nostats"]
     for c in clips:
         cmd += ["-ss", f"{c['in']:.3f}", "-t", f"{c['out'] - c['in']:.3f}", "-i", str(source)]
@@ -97,7 +101,8 @@ def build_command(source: Path, short: dict, meta: dict, ass_name: str | None,
     parts = []
     for i, c in enumerate(clips):
         dur = c["out"] - c["in"]
-        parts.append(_video_chain(i, short, meta, i))
+        parts.append(_video_chain(i, short, meta, i,
+                                  zoom=config.TEASER_ZOOM if i < n_teaser else 1.0))
         parts.append(f"[{i}:a]aresample=48000,aformat=channel_layouts=stereo,"
                      f"afade=t=in:d={AUDIO_FADE_S},"
                      f"afade=t=out:st={max(dur - AUDIO_FADE_S, 0):.3f}:d={AUDIO_FADE_S},"
@@ -149,7 +154,7 @@ def render_short(source: Path, short: dict, meta: dict, words: list[dict],
     cta = short.get("cta") or {}  # shorts antigos não têm o campo
     cta_text = cta.get("text") if cta.get("enabled") else None
     if short["captions"]["enabled"] or short["title_overlay"]["enabled"] or cta_text:
-        out_words = map_words_to_output(words, short["clips"])
+        out_words = map_words_to_output(words, render_clips(short))
         title = short["title"] if short["title_overlay"]["enabled"] else None
         (out_dir / ass).write_text(
             build_ass(out_words, title, short["title_overlay"]["seconds"],

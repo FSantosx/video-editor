@@ -13,6 +13,8 @@ legendas...) e o render só lê ele. Formato:
   "captions": {"enabled": true},
   "title_overlay": {"enabled": true, "seconds": 3.0},
   "cta": {"enabled": true, "text": "E você, o que acha? Comenta aí!"},  # chamada no fim
+  "teaser": {"enabled": true, "clips": [{"in": 80.1, "out": 82.9}], "text": "..."},  # abertura
+  # duration = teaser + clips; o render usa render_clips() = teaser + clips
   "render": {"status": "pending", "file": null, "error": null, "version": 0}
 }
 """
@@ -74,14 +76,32 @@ def clips_duration(clips: list[dict]) -> float:
     return round(sum(c["out"] - c["in"] for c in clips), 3)
 
 
+def teaser_clips(short: dict) -> list[dict]:
+    teaser = short.get("teaser") or {}  # shorts antigos não têm teaser
+    return list(teaser.get("clips") or []) if teaser.get("enabled") else []
+
+
+def render_clips(short: dict) -> list[dict]:
+    """O que vai para o vídeo, na ordem: teaser (se ligado) + corte principal."""
+    return teaser_clips(short) + list(short["clips"])
+
+
+def update_duration(short: dict) -> dict:
+    short["duration"] = clips_duration(render_clips(short))
+    return short
+
+
+NO_TEASER = {"enabled": False, "clips": [], "text": ""}
+
+
 def build_short(idx: int, candidate: dict, words: list[dict], fmt: str = "9:16",
-                group: int | None = None) -> dict:
+                group: int | None = None, teaser: dict | None = None) -> dict:
     # A seleção pode ter cortado frases de bastidor do meio: só usa os segmentos mantidos
     segments = candidate.get("segments") or [candidate]
     clips = []
     for seg in segments:
         clips += build_clips(words_in(words, seg["start"], seg["end"]))
-    return {
+    short = {
         "id": idx,
         # mesmo trecho em formatos diferentes (9:16, 1:1) compartilha o group
         "group": group if group is not None else idx,
@@ -96,16 +116,21 @@ def build_short(idx: int, candidate: dict, words: list[dict], fmt: str = "9:16",
         "captions": {"enabled": True},
         "title_overlay": {"enabled": True, "seconds": 3.0},
         "cta": {"enabled": config.CTA_ENABLED, "text": config.CTA_TEXT},
+        "teaser": dict(teaser or NO_TEASER),
         "render": {"status": "pending", "file": None, "error": None, "version": 0},
     }
+    return update_duration(short)
 
 
-def apply_window(short: dict, words: list[dict], start: float, end: float) -> dict:
-    """Usado quando o usuário ajusta início/fim no app: recalcula os cortes."""
+def apply_window(short: dict, words: list[dict], start: float, end: float,
+                 teaser: dict | None = None) -> dict:
+    """Usado quando o usuário ajusta início/fim no app: recalcula os cortes (e o teaser)."""
     window_words = words_in(words, start, end)
     short["window"] = {"start": round(start, 3), "end": round(end, 3)}
     short["clips"] = build_clips(window_words)
-    short["duration"] = clips_duration(short["clips"])
     short["text"] = " ".join(w["word"] for w in window_words)
     short["reframe"] = {"mode": "auto", "centers": []}
-    return short
+    if teaser is not None:
+        was_on = (short.get("teaser") or {}).get("enabled", config.TEASER_ENABLED)
+        short["teaser"] = {**teaser, "enabled": bool(teaser["clips"]) and was_on}
+    return update_duration(short)

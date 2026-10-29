@@ -43,6 +43,12 @@ CTA_ENABLED = os.getenv("CTA_ENABLED", "1") == "1"
 CTA_TEXT = os.getenv("CTA_TEXT", "E você, o que acha? Comenta aí!")
 CTA_SECONDS = _env_float("CTA_SECONDS", 3.0)
 
+# Abertura com teaser: o short começa com o momento mais forte do trecho e depois volta
+# ao início (ataca quem desliza nos primeiros segundos)
+TEASER_ENABLED = os.getenv("TEASER_ENABLED", "1") == "1"
+TEASER_MAX_S = _env_float("TEASER_MAX_S", 3.5)
+TEASER_ZOOM = _env_float("TEASER_ZOOM", 1.08)  # leve zoom para marcar que é uma prévia
+
 # Formatos gerados para cada trecho escolhido (largura x altura da saída)
 FORMAT_SIZES = {"9:16": (1080, 1920), "1:1": (1080, 1080)}
 FORMATS = [f.strip() for f in os.getenv("FORMATS", "9:16").split(",") if f.strip()]

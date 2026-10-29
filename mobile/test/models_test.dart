@@ -68,6 +68,12 @@ void main() {
       expect(draft.diff(short).toJson(), {'cta': true, 'cta_text': 'Comenta aí!'});
     });
 
+    test('ligar o teaser envia só o teaser', () {
+      final draft = ShortDraft.fromShort(short).copyWith(teaser: true);
+      expect(short.teaser, isFalse); // fixture antigo, sem teaser
+      expect(draft.diff(short).toJson(), {'teaser': true});
+    });
+
     test('voltar ao enquadramento automático', () {
       final draft = ShortDraft.fromShort(short).copyWith(autoReframe: true);
       expect(draft.diff(short).toJson(), {'auto_reframe': true});

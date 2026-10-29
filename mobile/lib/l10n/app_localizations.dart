@@ -400,6 +400,18 @@ abstract class AppLocalizations {
   /// **'Título nos primeiros segundos'**
   String get titleOverlay;
 
+  /// No description provided for @teaser.
+  ///
+  /// In pt, this message translates to:
+  /// **'Abertura com teaser'**
+  String get teaser;
+
+  /// No description provided for @teaserHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Começa com o momento mais forte e volta ao início'**
+  String get teaserHint;
+
   /// No description provided for @cta.
   ///
   /// In pt, this message translates to:

@@ -150,6 +150,14 @@ class _EditorState extends ConsumerState<_Editor> {
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
+          title: Text(l10n.teaser),
+          subtitle: Text(short.teaserText.isEmpty ? l10n.teaserHint : '“${short.teaserText}”',
+              maxLines: 2, overflow: TextOverflow.ellipsis),
+          value: _draft.teaser,
+          onChanged: (v) => setState(() => _draft = _draft.copyWith(teaser: v)),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
           title: Text(l10n.titleOverlay),
           value: _draft.titleOverlay,
           onChanged: (v) => setState(() => _draft = _draft.copyWith(titleOverlay: v)),

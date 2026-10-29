@@ -107,10 +107,28 @@ def _sentence_features(s: dict, words: list[dict], energy: np.ndarray) -> dict:
     }
 
 
-def _zscore(values: list[float]) -> np.ndarray:
+def _zscore(values: list[float], min_std: float = 1e-6) -> np.ndarray:
+    """z-score com piso no desvio-padrão: diferenças menores que o ruído de medida
+    (ex.: 2,52 vs 2,56 palavras/s) não podem virar ±2 desvios e decidir sozinhas."""
     arr = np.array(values, dtype=float)
-    std = arr.std()
-    return (arr - arr.mean()) / std if std > 1e-6 else np.zeros_like(arr)
+    if arr.size == 0:
+        return arr
+    return (arr - arr.mean()) / max(arr.std(), min_std)
+
+
+def score_sentences(words: list[dict], energy: list[float]):
+    """Frases + características + nota de cada uma (relativas ao vídeo inteiro)."""
+    sentences = split_sentences(words)
+    energy_arr = np.array(energy, dtype=float)
+    feats = [_sentence_features(s, words, energy_arr) for s in sentences]
+    rate_z = _zscore([f["rate"] for f in feats], min_std=0.15)       # palavras/s
+    energy_z = _zscore([f["energy"] for f in feats], min_std=1.5)    # dB
+    sent_score = []
+    for f, rz, ez in zip(feats, rate_z, energy_z):
+        sent_score.append(0.35 * np.clip(rz, -2, 2) + 0.35 * np.clip(ez, -2, 2)
+                          + 0.4 * min(f["hooks"], 3) + 0.3 * min(f["numbers"], 2)
+                          + 0.4 * f["exclaim"] - 1.0 * f["filler"])
+    return sentences, feats, sent_score, energy_z
 
 
 def select_shorts(words: list[dict], energy: list[float],
@@ -120,17 +138,7 @@ def select_shorts(words: list[dict], energy: list[float],
     if not words:
         return []
     target_s = min(max(target_s, min_s), max_s)
-    sentences = split_sentences(words)
-    energy_arr = np.array(energy, dtype=float)
-    feats = [_sentence_features(s, words, energy_arr) for s in sentences]
-
-    rate_z = _zscore([f["rate"] for f in feats])
-    energy_z = _zscore([f["energy"] for f in feats])
-    sent_score = []
-    for f, rz, ez in zip(feats, rate_z, energy_z):
-        sent_score.append(0.35 * np.clip(rz, -2, 2) + 0.35 * np.clip(ez, -2, 2)
-                          + 0.4 * min(f["hooks"], 3) + 0.3 * min(f["numbers"], 2)
-                          + 0.4 * f["exclaim"] - 1.0 * f["filler"])
+    sentences, feats, sent_score, energy_z = score_sentences(words, energy)
     gaps_before = [0.0] + [b["start"] - a["end"] for a, b in zip(sentences, sentences[1:])]
 
     sent_dur = [speech_duration(words[s["word_idx"][0]: s["word_idx"][1]]) for s in sentences]

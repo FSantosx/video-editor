@@ -240,7 +240,7 @@ const editor = $("#editor");
 const f = {
   title: $("#f-title"), start: $("#f-start"), end: $("#f-end"), captions: $("#f-captions"),
   titleOverlay: $("#f-title-overlay"), auto: $("#f-auto"), crop: $("#f-crop"), sync: $("#f-sync"),
-  cta: $("#f-cta"), ctaText: $("#f-cta-text"),
+  cta: $("#f-cta"), ctaText: $("#f-cta-text"), teaser: $("#f-teaser"),
 };
 
 function openEditor(video, shortId) {
@@ -268,6 +268,8 @@ function openEditor(video, shortId) {
   f.captions.checked = short.captions.enabled;
   f.titleOverlay.checked = short.title_overlay.enabled;
   f.cta.checked = Boolean(short.cta?.enabled);
+  f.teaser.checked = Boolean(short.teaser?.enabled);
+  $("#o-teaser").textContent = short.teaser?.text ? `“${short.teaser.text}”` : "";
   f.ctaText.value = short.cta?.text ?? "";
   f.auto.checked = !short.reframe.manual;
   f.crop.value = short.reframe.centers?.[0] ?? 0.5;
@@ -317,6 +319,7 @@ $("#editor-form").addEventListener("submit", async (e) => {
   if (f.captions.checked !== short.captions.enabled) patch.captions = f.captions.checked;
   if (f.titleOverlay.checked !== short.title_overlay.enabled) patch.title_overlay = f.titleOverlay.checked;
   if (f.cta.checked !== Boolean(short.cta?.enabled)) patch.cta = f.cta.checked;
+  if (f.teaser.checked !== Boolean(short.teaser?.enabled)) patch.teaser = f.teaser.checked;
   if (f.cta.checked && f.ctaText.value.trim() && f.ctaText.value.trim() !== short.cta?.text) {
     patch.cta_text = f.ctaText.value.trim();
   }

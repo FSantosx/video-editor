@@ -76,6 +76,8 @@ class Short {
     required this.titleOverlay,
     required this.cta,
     required this.ctaText,
+    required this.teaser,
+    required this.teaserText,
     required this.render,
   });
 
@@ -84,6 +86,7 @@ class Short {
     final reframe = json['reframe'] as Map<String, dynamic>;
     final centers = (reframe['centers'] as List).cast<num>();
     final cta = json['cta'] as Map<String, dynamic>?; // ausente em shorts antigos
+    final teaser = json['teaser'] as Map<String, dynamic>?;
     return Short(
       id: json['id'] as int,
       title: json['title'] as String,
@@ -99,6 +102,8 @@ class Short {
       titleOverlay: (json['title_overlay'] as Map<String, dynamic>)['enabled'] as bool,
       cta: cta?['enabled'] as bool? ?? false,
       ctaText: cta?['text'] as String? ?? '',
+      teaser: teaser?['enabled'] as bool? ?? false,
+      teaserText: teaser?['text'] as String? ?? '',
       render: ShortRender.fromJson(json['render'] as Map<String, dynamic>),
     );
   }
@@ -119,6 +124,10 @@ class Short {
   /// Chamada no final (ex.: "E você, o que acha? Comenta aí!")
   final bool cta;
   final String ctaText;
+
+  /// Abertura com teaser: começa com o momento mais forte e volta ao início.
+  final bool teaser;
+  final String teaserText;
   final ShortRender render;
 }
 
@@ -185,6 +194,7 @@ class ShortPatch {
     this.autoReframe,
     this.cta,
     this.ctaText,
+    this.teaser,
   });
 
   final String? title;
@@ -196,6 +206,7 @@ class ShortPatch {
   final bool? autoReframe;
   final bool? cta;
   final String? ctaText;
+  final bool? teaser;
 
   Map<String, dynamic> toJson() => {
         if (title != null) 'title': title,
@@ -207,6 +218,7 @@ class ShortPatch {
         if (autoReframe != null) 'auto_reframe': autoReframe,
         if (cta != null) 'cta': cta,
         if (ctaText != null) 'cta_text': ctaText,
+        if (teaser != null) 'teaser': teaser,
       };
 
   bool get isEmpty => toJson().isEmpty;

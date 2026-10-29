@@ -23,7 +23,8 @@ from pydantic import BaseModel, Field
 
 from . import config, jobs, store
 from .pipeline import render, transcribe
-from .pipeline.edit import apply_window
+from .pipeline.edit import apply_window, render_clips, update_duration
+from .pipeline.teaser import build_teaser
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 ALLOWED_EXT = {".mp4", ".mov", ".m4v", ".mkv", ".webm"}
@@ -140,6 +141,8 @@ class ShortPatch(BaseModel):
     # chamada no final do corte (ex.: "E você, o que acha? Comenta aí!")
     cta: bool | None = None
     cta_text: str | None = Field(None, max_length=80)
+    # abertura com teaser (momento mais forte do trecho antes do início)
+    teaser: bool | None = None
     # aplica também aos outros formatos do mesmo trecho (ex.: o 1:1 do mesmo 9:16)
     sync_group: bool = False
 
@@ -148,7 +151,8 @@ class ShortPatch(BaseModel):
 def patch_short(vid: str, sid: int, patch: ShortPatch):
     short = _short_or_404(vid, sid)
     meta = store.get_video(vid)["meta"]
-    words = store.get_analysis(vid)["words"]
+    analysis = store.get_analysis(vid)
+    words, energy = analysis["words"], analysis.get("energy", [])
 
     start = patch.start if patch.start is not None else short["window"]["start"]
     end = patch.end if patch.end is not None else short["window"]["end"]
@@ -159,11 +163,24 @@ def patch_short(vid: str, sid: int, patch: ShortPatch):
     if end > meta["duration"] + 0.5:
         raise HTTPException(422, "end além do fim do vídeo")
 
+    window_changed = patch.start is not None or patch.end is not None
+    new_teaser = None
+    if window_changed or (patch.teaser and not (short.get("teaser") or {}).get("clips")):
+        new_teaser = build_teaser(words, energy, [{"start": start, "end": end}])
+        if patch.teaser and not new_teaser["clips"]:
+            raise HTTPException(422, "não achei um bom momento para o teaser neste trecho")
+
     def mutate(s):
-        if patch.start is not None or patch.end is not None:
-            apply_window(s, words, start, end)
+        if window_changed:
+            apply_window(s, words, start, end, teaser=new_teaser)
             if not s["clips"]:
                 raise HTTPException(422, "não há fala nesse intervalo")
+        elif new_teaser is not None:
+            s["teaser"] = new_teaser
+        if patch.teaser is not None:
+            s.setdefault("teaser", {"enabled": False, "clips": [], "text": ""})
+            s["teaser"]["enabled"] = patch.teaser and bool(s["teaser"]["clips"])
+        update_duration(s)
         if patch.title is not None:
             s["title"] = patch.title.strip()
         if patch.captions is not None:
@@ -181,8 +198,15 @@ def patch_short(vid: str, sid: int, patch: ShortPatch):
             s["reframe"] = {"mode": "auto", "centers": []}
         elif (patch.crop_center is not None
               and meta["width"] / meta["height"] > target_w / target_h):
-            s["reframe"] = {"mode": "crop", "centers": [patch.crop_center] * len(s["clips"]),
+            s["reframe"] = {"mode": "crop", "centers": [patch.crop_center] * len(render_clips(s)),
                             "manual": True}
+        # Teaser ligado/desligado muda o número de clips: ajusta os centros do recorte
+        n = len(render_clips(s))
+        if s["reframe"]["mode"] == "crop" and len(s["reframe"]["centers"]) != n:
+            if s["reframe"].get("manual"):
+                s["reframe"]["centers"] = [s["reframe"]["centers"][0]] * n
+            else:
+                s["reframe"] = {"mode": "auto", "centers": []}
         s["render"]["status"] = "pending"
 
     targets = [sid]

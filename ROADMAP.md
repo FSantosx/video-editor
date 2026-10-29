@@ -104,6 +104,15 @@ inscritos de sobra. O ponto fraco da qualidade é o **início** (44% deslizam).
 
 ## Próximas evoluções (por impacto)
 
+### ✅ Abertura com teaser (feito em 2026-10-29)
+
+O short começa com 1,2 a 3,5s do momento mais forte da 2ª metade do trecho (exclamação,
+número, frase conclusiva), com zoom de 8% para marcar a prévia, e depois volta ao início.
+`backend/app/pipeline/teaser.py`; JSON `teaser: {enabled, clips, text}`; `render_clips()` =
+teaser + corte. Liga e desliga com `TEASER_ENABLED`, no PATCH `teaser`, no PC e no app. O alvo
+de duração desconta o teaser. **Medir:** "continuaram assistindo" dos cortes com teaser
+contra os 56,2% de 28/10.
+
 ### 0. Gancho do primeiro segundo (ligado à meta: continuaram assistindo de 56% para ≥ 65%)
 
 **Onde:** `backend/app/pipeline/select.py` (peso do `hook`) e `captions.py` (título na tela).
