@@ -30,24 +30,35 @@ def video_dir(vid: str) -> Path:
     return config.VIDEOS_DIR / vid
 
 
+# No Windows, abrir um arquivo no instante em que outro o substitui (os.replace) dá
+# PermissionError. Dentro do processo, o _lock serializa leituras e gravações; as
+# novas tentativas cobrem outros programas (ex.: antivírus lendo o arquivo recém-gravado).
+RETRIES, RETRY_WAIT_S = 40, 0.05
+
+
+def _retry(fn):
+    for attempt in range(RETRIES):
+        try:
+            return fn()
+        except PermissionError:
+            if attempt == RETRIES - 1:
+                raise
+            time.sleep(RETRY_WAIT_S)
+
+
 def _read(path: Path, default=None):
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return default
+    with _lock:
+        try:
+            return json.loads(_retry(lambda: path.read_text(encoding="utf-8")))
+        except FileNotFoundError:
+            return default
 
 
 def _write(path: Path, data) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
-    for attempt in range(20):
-        try:
-            os.replace(tmp, path)  # atômico: nunca deixa JSON pela metade
-            return
-        except PermissionError:  # Windows: alguém lendo o arquivo neste instante
-            if attempt == 19:
-                raise
-            time.sleep(0.05)
+    with _lock:
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+        _retry(lambda: os.replace(tmp, path))  # atômico: nunca deixa JSON pela metade
 
 
 def create_video(filename: str) -> dict:

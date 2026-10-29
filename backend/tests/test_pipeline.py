@@ -92,3 +92,39 @@ def test_cta_shown_at_end_without_overlapping_title():
     short = build_ass(words, "Título", 3.0, cta="Comenta aí!", cta_seconds=3.0, total=4.5)
     assert "0:00:03.00,0:00:04.50" in short
     assert "Comenta" not in build_ass(words, "T", 3.0, cta="Comenta aí!", total=3.5)
+
+
+def test_store_retries_when_windows_locks_the_file(tmp_path, monkeypatch):
+    """Windows: ler/substituir um arquivo aberto por outro dá PermissionError; deve tentar de novo."""
+    from pathlib import Path
+
+    from app import store
+    path = tmp_path / "x.json"
+    store._write(path, {"a": 1})
+
+    calls = {"n": 0}
+    real_read = Path.read_text
+
+    def flaky_read(self, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] <= 3:
+            raise PermissionError(13, "Permission denied")
+        return real_read(self, *args, **kwargs)
+
+    monkeypatch.setattr(store, "RETRY_WAIT_S", 0)
+    monkeypatch.setattr(Path, "read_text", flaky_read)
+    assert store._read(path) == {"a": 1} and calls["n"] == 4
+
+    real_replace = store.os.replace
+    fails = {"n": 0}
+
+    def flaky_replace(src, dst):
+        fails["n"] += 1
+        if fails["n"] <= 2:
+            raise PermissionError(13, "Permission denied")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(Path, "read_text", real_read)
+    monkeypatch.setattr(store.os, "replace", flaky_replace)
+    store._write(path, {"a": 2})
+    assert store._read(path) == {"a": 2}
