@@ -162,6 +162,16 @@ chamada para comentar vai para o meio (no fim, ela denunciaria o término). `mai
 Também corrigido: o detector Haar dava falso positivo em ~4% dos frames sem rosto, e uma única
 detecção virava recorte. Agora exige rosto em ≥ 20% das amostras (`MIN_FACE_RATIO`).
 
+### ✅ Agenda de publicação no YouTube (feito em 2026-11-01)
+
+Fila no servidor (`backend/app/publish/`) que encaixa cortes nos horários 12h/18h/21h
+(Brasília, editáveis), com título, descrição e hashtags prontos. **Modo assistido**: lembretes
+agendados no próprio celular (funcionam com o Railway dormindo); o toque abre a tela de
+postagem (título copiado + compartilhar com o app do YouTube + marcar como postado).
+**Modo automático**: OAuth do Google + upload com `publishAt`; só liga com `YOUTUBE_AUDITED=1`,
+porque projetos não auditados têm os envios forçados a privado. **Pendente (do usuário)**:
+criar o projeto no Google Cloud, configurar as variáveis e pedir a auditoria (docs/YOUTUBE.md).
+
 ### 0. Gancho do primeiro segundo (ligado à meta: continuaram assistindo de 56% para ≥ 65%)
 
 **Onde:** `backend/app/pipeline/select.py` (peso do `hook`) e `captions.py` (título na tela).

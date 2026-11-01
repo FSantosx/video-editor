@@ -68,6 +68,22 @@ TITLES_ENGINE = os.getenv("TITLES_ENGINE", "auto")
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-5-5")
 CLAUDE_EFFORT = os.getenv("CLAUDE_EFFORT", "medium")
 
+# Publicação no YouTube
+# Horários padrão (no fuso PUBLISH_TZ) em que a fila encaixa os cortes
+PUBLISH_SLOTS = [s.strip() for s in os.getenv("PUBLISH_SLOTS", "12:00,18:00,21:00").split(",")
+                 if s.strip()]
+PUBLISH_TZ = os.getenv("PUBLISH_TZ", "America/Sao_Paulo")
+PUBLISH_HASHTAGS = os.getenv("PUBLISH_HASHTAGS", "#shorts")  # sempre no fim da descrição
+# Integração com a API do YouTube (OAuth). Sem isso, a fila funciona no modo assistido.
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+# URL pública do servidor (para o retorno do login do Google), ex.: https://xxx.up.railway.app
+PUBLIC_URL = os.getenv("PUBLIC_URL", "").rstrip("/")
+# Projetos não auditados pelo Google só conseguem enviar vídeos privados (e o publishAt
+# não tem efeito). Mude para 1 quando a auditoria da API for aprovada.
+YOUTUBE_AUDITED = os.getenv("YOUTUBE_AUDITED", "0") == "1"
+YOUTUBE_CATEGORY_ID = os.getenv("YOUTUBE_CATEGORY_ID", "25")  # 25 = Notícias e política
+
 # Versão do pipeline de edição: aumente quando a forma de gerar os cortes mudar.
 # Vídeos processados com versão menor aparecem como "desatualizados" e podem ser
 # reprocessados (sem transcrever de novo).

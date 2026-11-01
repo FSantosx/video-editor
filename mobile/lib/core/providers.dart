@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/publish/data/publish_repository.dart';
+import '../features/publish/domain/publish_models.dart';
 import '../features/settings/data/settings_repository.dart';
 import '../features/settings/domain/app_settings.dart';
 import '../features/videos/data/videos_repository.dart';
 import '../features/videos/domain/models.dart';
 import 'api/api_client.dart';
+import 'notifications.dart';
 import 'result.dart';
 
 final settingsRepositoryProvider = Provider((ref) => SettingsRepository());
@@ -67,4 +70,27 @@ final videoDetailProvider = StreamProvider.autoDispose.family<Video, String>((re
     }
     await Future<void>.delayed(pollInterval);
   }
+});
+
+// ---------------------------------------------------------------- publicação
+
+final publishRepositoryProvider = Provider<PublishRepository?>((ref) {
+  final settings = ref.watch(settingsProvider).value;
+  if (settings == null || !settings.isConfigured) return null;
+  return PublishRepository(ApiClient(baseUrl: settings.serverUrl, apiKey: settings.apiKey));
+});
+
+/// Fila de publicação. A cada carga, os lembretes do celular são refeitos a partir dela.
+final publishQueueProvider = FutureProvider.autoDispose<List<PublishItem>>((ref) async {
+  final repo = ref.watch(publishRepositoryProvider);
+  if (repo == null) return const [];
+  final items = _unwrap(await repo.queue());
+  await PostingReminders.instance.sync(items);
+  return items;
+});
+
+final publishSettingsProvider = FutureProvider.autoDispose<PublishSettings>((ref) async {
+  final repo = ref.watch(publishRepositoryProvider);
+  if (repo == null) throw const FailureException(Failure(FailureKind.unknown));
+  return _unwrap(await repo.settings());
 });

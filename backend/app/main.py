@@ -8,7 +8,6 @@ Fluxo:
 """
 import logging
 import os
-import secrets
 import shutil
 import subprocess
 import sys
@@ -16,12 +15,14 @@ import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import config, jobs, store
+from .auth import require_key
+from .publish.routes import router as publish_router
 from .pipeline import render, titles, transcribe
 from .pipeline.edit import apply_window, render_clips, update_duration
 from .pipeline.teaser import apply_loop, build_teaser
@@ -43,13 +44,6 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="Video Editor - Shorts", version="0.1.0", lifespan=lifespan)
 
-
-def require_key(request: Request) -> None:
-    if not config.API_KEY:
-        return
-    key = request.headers.get("x-api-key") or request.query_params.get("key") or ""
-    if not secrets.compare_digest(key, config.API_KEY):
-        raise HTTPException(401, "API key inválida")
 
 
 def _video_or_404(vid: str) -> dict:
@@ -322,6 +316,8 @@ def open_folder(vid: str):
     else:
         subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(folder)])
 
+
+app.include_router(publish_router)
 
 # Interface web local (desktop/web): registrada por último para não encobrir a API
 if config.DESKTOP_MODE and config.WEB_DIR.is_dir():

@@ -80,5 +80,8 @@ class VideosRepository {
   Uri thumbUri(String videoId, Short short) =>
       _api.uri('/videos/$videoId/shorts/${short.id}/thumb', {'v': '${short.render.version}'});
 
+  Uri thumbUriFor(String videoId, int shortId, int version) =>
+      _api.uri('/videos/$videoId/shorts/$shortId/thumb', {'v': '$version'});
+
   Map<String, String> get authHeaders => _api.authHeaders;
 }

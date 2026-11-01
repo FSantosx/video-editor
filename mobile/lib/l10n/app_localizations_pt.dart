@@ -98,7 +98,7 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get statusUploading => 'Enviando';
+  String get statusUploading => 'Enviando ao YouTube';
 
   @override
   String get statusQueued => 'Na fila';
@@ -271,4 +271,159 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get pause => 'Pausar';
+
+  @override
+  String get agendaTitle => 'Agenda de publicação';
+
+  @override
+  String get agendaEmpty =>
+      'Nada agendado. Abra um vídeo e toque em “Agendar cortes” para encaixá-los nos próximos horários.';
+
+  @override
+  String get scheduleAll => 'Agendar cortes';
+
+  @override
+  String get scheduleShort => 'Agendar';
+
+  @override
+  String scheduledMany(int count, String when) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count cortes agendados',
+      one: '1 corte agendado',
+    );
+    return '$_temp0. Próximo: $when';
+  }
+
+  @override
+  String get statusScheduled => 'Agendado';
+
+  @override
+  String get statusOverdue => 'Atrasado: poste agora';
+
+  @override
+  String get statusUploaded => 'No YouTube';
+
+  @override
+  String get statusScheduledOnYoutube => 'Agendado no YouTube';
+
+  @override
+  String get statusPosted => 'Postado';
+
+  @override
+  String get statusSkipped => 'Pulado';
+
+  @override
+  String get statusFailed => 'Falhou';
+
+  @override
+  String get today => 'Hoje';
+
+  @override
+  String get tomorrow => 'Amanhã';
+
+  @override
+  String get postNow => 'Postar no YouTube';
+
+  @override
+  String get postNowHint =>
+      'O título é copiado e o compartilhamento abre: escolha YouTube e cole o título.';
+
+  @override
+  String get postedQuestion => 'Postou no YouTube?';
+
+  @override
+  String get postedYes => 'Sim, marcar como postado';
+
+  @override
+  String get notYet => 'Ainda não';
+
+  @override
+  String get copyTitle => 'Copiar título';
+
+  @override
+  String get copyDescription => 'Copiar descrição';
+
+  @override
+  String get copied => 'Copiado!';
+
+  @override
+  String get description => 'Descrição';
+
+  @override
+  String get saveChanges => 'Salvar alterações';
+
+  @override
+  String get markPosted => 'Marcar como postado';
+
+  @override
+  String get skip => 'Pular';
+
+  @override
+  String get reschedule => 'Remarcar';
+
+  @override
+  String get removeFromQueue => 'Tirar da agenda';
+
+  @override
+  String get uploadTest => 'Enviar ao YouTube (teste, privado)';
+
+  @override
+  String get uploadTestHint =>
+      'Sem a auditoria do Google, o YouTube deixa o vídeo privado.';
+
+  @override
+  String get openOnYoutube => 'Abrir no YouTube';
+
+  @override
+  String get missingShort => 'Este corte foi apagado.';
+
+  @override
+  String get publishSettings => 'Publicação';
+
+  @override
+  String get youtubeSection => 'Canal do YouTube';
+
+  @override
+  String get youtubeNotConfigured =>
+      'O servidor ainda não tem as credenciais do Google (veja docs/YOUTUBE.md). Enquanto isso, a agenda funciona com lembretes.';
+
+  @override
+  String get youtubeConnect => 'Conectar canal';
+
+  @override
+  String get youtubeConnectHint =>
+      'Abre o login do Google no navegador. Depois volte ao app.';
+
+  @override
+  String get youtubeDisconnect => 'Desconectar';
+
+  @override
+  String youtubeConnected(String channel) {
+    return 'Conectado: $channel';
+  }
+
+  @override
+  String get youtubeAuditPending =>
+      'Auditoria do Google pendente: envios pela API ficam privados. A agenda usa lembretes até a aprovação.';
+
+  @override
+  String get youtubeAuto =>
+      'Publicação automática ativa: agendar já envia ao YouTube com o horário programado.';
+
+  @override
+  String get slotsTitle => 'Horários de postagem';
+
+  @override
+  String slotsHint(String tz) {
+    return 'Fuso do servidor: $tz';
+  }
+
+  @override
+  String get addSlot => 'Adicionar horário';
+
+  @override
+  String get remindersDenied =>
+      'Ative as notificações do app para receber os lembretes de postagem.';
 }

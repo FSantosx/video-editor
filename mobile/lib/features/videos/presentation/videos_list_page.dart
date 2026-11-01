@@ -34,6 +34,11 @@ class VideosListPage extends ConsumerWidget {
         title: Text(l10n.appTitle),
         actions: [
           IconButton(
+            tooltip: l10n.agendaTitle,
+            icon: const Icon(Icons.calendar_month_outlined),
+            onPressed: () => context.push('/publish'),
+          ),
+          IconButton(
             tooltip: l10n.settingsTitle,
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => context.push('/settings'),

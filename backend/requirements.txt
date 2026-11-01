@@ -5,5 +5,10 @@ faster-whisper==1.2.1
 # títulos de gancho com o Claude (opcional: só é usado com ANTHROPIC_API_KEY)
 anthropic==2.3.0
 numpy==2.5.4
+# publicação no YouTube (OAuth + upload) e fuso horário da agenda
+google-api-python-client==2.201.0
+google-auth==2.62.0
+google-auth-oauthlib==1.5.0
+tzdata==2026.6
 # 4.x: o OpenCV 5 removeu o CascadeClassifier (detector de rosto usado no reenquadramento)
 opencv-python-headless==4.14.0.94

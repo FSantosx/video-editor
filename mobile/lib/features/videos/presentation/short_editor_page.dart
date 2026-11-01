@@ -3,13 +3,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gal/gal.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/l10n.dart';
 import '../../../core/providers.dart';
 import '../../../core/result.dart';
 import '../../../core/widgets/error_view.dart';
+import '../../publish/presentation/publish_widgets.dart';
+import '../data/short_file.dart';
 import '../domain/models.dart';
 import '../domain/short_draft.dart';
 import 'widgets/short_player.dart';
@@ -263,22 +264,22 @@ class _ExportMenuState extends ConsumerState<_ExportMenu> {
 
   /// Baixa o MP4 para o cache do app (reaproveita se a mesma versão já foi baixada).
   Future<File?> _download() async {
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/short_${widget.videoId}_${widget.short.id}_v${widget.short.render.version}.mp4');
-    if (await file.exists()) return file;
     setState(() => _progress = 0);
-    final result = await ref.read(videosRepositoryProvider)!.download(
-          widget.videoId,
-          widget.short.id,
-          file.path,
-          onProgress: (p) => mounted ? setState(() => _progress = p) : null,
-        );
+    final result = await cachedShortFile(
+      ref.read(videosRepositoryProvider)!,
+      widget.videoId,
+      widget.short.id,
+      widget.short.render.version,
+      onProgress: (p) => mounted ? setState(() => _progress = p) : null,
+    );
     if (mounted) setState(() => _progress = null);
-    if (result case Err(:final failure)) {
-      if (mounted) _snack(failure.message(context.l10n));
-      return null;
+    switch (result) {
+      case Ok(:final value):
+        return value;
+      case Err(:final failure):
+        if (mounted) _snack(failure.message(context.l10n));
+        return null;
     }
-    return file;
   }
 
   void _snack(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
@@ -320,6 +321,11 @@ class _ExportMenuState extends ConsumerState<_ExportMenu> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        IconButton(
+          tooltip: l10n.scheduleShort,
+          icon: const Icon(Icons.event_available),
+          onPressed: () => scheduleShorts(context, ref, widget.videoId, shortIds: [widget.short.id]),
+        ),
         IconButton(tooltip: l10n.saveToGallery, icon: const Icon(Icons.download), onPressed: _saveToGallery),
         IconButton(tooltip: l10n.share, icon: const Icon(Icons.share), onPressed: _share),
       ],

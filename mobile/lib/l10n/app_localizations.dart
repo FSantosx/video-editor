@@ -259,7 +259,7 @@ abstract class AppLocalizations {
   /// No description provided for @statusUploading.
   ///
   /// In pt, this message translates to:
-  /// **'Enviando'**
+  /// **'Enviando ao YouTube'**
   String get statusUploading;
 
   /// No description provided for @statusQueued.
@@ -573,6 +573,276 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Pausar'**
   String get pause;
+
+  /// No description provided for @agendaTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Agenda de publicação'**
+  String get agendaTitle;
+
+  /// No description provided for @agendaEmpty.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nada agendado. Abra um vídeo e toque em “Agendar cortes” para encaixá-los nos próximos horários.'**
+  String get agendaEmpty;
+
+  /// No description provided for @scheduleAll.
+  ///
+  /// In pt, this message translates to:
+  /// **'Agendar cortes'**
+  String get scheduleAll;
+
+  /// No description provided for @scheduleShort.
+  ///
+  /// In pt, this message translates to:
+  /// **'Agendar'**
+  String get scheduleShort;
+
+  /// No description provided for @scheduledMany.
+  ///
+  /// In pt, this message translates to:
+  /// **'{count, plural, =1{1 corte agendado} other{{count} cortes agendados}}. Próximo: {when}'**
+  String scheduledMany(int count, String when);
+
+  /// No description provided for @statusScheduled.
+  ///
+  /// In pt, this message translates to:
+  /// **'Agendado'**
+  String get statusScheduled;
+
+  /// No description provided for @statusOverdue.
+  ///
+  /// In pt, this message translates to:
+  /// **'Atrasado: poste agora'**
+  String get statusOverdue;
+
+  /// No description provided for @statusUploaded.
+  ///
+  /// In pt, this message translates to:
+  /// **'No YouTube'**
+  String get statusUploaded;
+
+  /// No description provided for @statusScheduledOnYoutube.
+  ///
+  /// In pt, this message translates to:
+  /// **'Agendado no YouTube'**
+  String get statusScheduledOnYoutube;
+
+  /// No description provided for @statusPosted.
+  ///
+  /// In pt, this message translates to:
+  /// **'Postado'**
+  String get statusPosted;
+
+  /// No description provided for @statusSkipped.
+  ///
+  /// In pt, this message translates to:
+  /// **'Pulado'**
+  String get statusSkipped;
+
+  /// No description provided for @statusFailed.
+  ///
+  /// In pt, this message translates to:
+  /// **'Falhou'**
+  String get statusFailed;
+
+  /// No description provided for @today.
+  ///
+  /// In pt, this message translates to:
+  /// **'Hoje'**
+  String get today;
+
+  /// No description provided for @tomorrow.
+  ///
+  /// In pt, this message translates to:
+  /// **'Amanhã'**
+  String get tomorrow;
+
+  /// No description provided for @postNow.
+  ///
+  /// In pt, this message translates to:
+  /// **'Postar no YouTube'**
+  String get postNow;
+
+  /// No description provided for @postNowHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'O título é copiado e o compartilhamento abre: escolha YouTube e cole o título.'**
+  String get postNowHint;
+
+  /// No description provided for @postedQuestion.
+  ///
+  /// In pt, this message translates to:
+  /// **'Postou no YouTube?'**
+  String get postedQuestion;
+
+  /// No description provided for @postedYes.
+  ///
+  /// In pt, this message translates to:
+  /// **'Sim, marcar como postado'**
+  String get postedYes;
+
+  /// No description provided for @notYet.
+  ///
+  /// In pt, this message translates to:
+  /// **'Ainda não'**
+  String get notYet;
+
+  /// No description provided for @copyTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Copiar título'**
+  String get copyTitle;
+
+  /// No description provided for @copyDescription.
+  ///
+  /// In pt, this message translates to:
+  /// **'Copiar descrição'**
+  String get copyDescription;
+
+  /// No description provided for @copied.
+  ///
+  /// In pt, this message translates to:
+  /// **'Copiado!'**
+  String get copied;
+
+  /// No description provided for @description.
+  ///
+  /// In pt, this message translates to:
+  /// **'Descrição'**
+  String get description;
+
+  /// No description provided for @saveChanges.
+  ///
+  /// In pt, this message translates to:
+  /// **'Salvar alterações'**
+  String get saveChanges;
+
+  /// No description provided for @markPosted.
+  ///
+  /// In pt, this message translates to:
+  /// **'Marcar como postado'**
+  String get markPosted;
+
+  /// No description provided for @skip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Pular'**
+  String get skip;
+
+  /// No description provided for @reschedule.
+  ///
+  /// In pt, this message translates to:
+  /// **'Remarcar'**
+  String get reschedule;
+
+  /// No description provided for @removeFromQueue.
+  ///
+  /// In pt, this message translates to:
+  /// **'Tirar da agenda'**
+  String get removeFromQueue;
+
+  /// No description provided for @uploadTest.
+  ///
+  /// In pt, this message translates to:
+  /// **'Enviar ao YouTube (teste, privado)'**
+  String get uploadTest;
+
+  /// No description provided for @uploadTestHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Sem a auditoria do Google, o YouTube deixa o vídeo privado.'**
+  String get uploadTestHint;
+
+  /// No description provided for @openOnYoutube.
+  ///
+  /// In pt, this message translates to:
+  /// **'Abrir no YouTube'**
+  String get openOnYoutube;
+
+  /// No description provided for @missingShort.
+  ///
+  /// In pt, this message translates to:
+  /// **'Este corte foi apagado.'**
+  String get missingShort;
+
+  /// No description provided for @publishSettings.
+  ///
+  /// In pt, this message translates to:
+  /// **'Publicação'**
+  String get publishSettings;
+
+  /// No description provided for @youtubeSection.
+  ///
+  /// In pt, this message translates to:
+  /// **'Canal do YouTube'**
+  String get youtubeSection;
+
+  /// No description provided for @youtubeNotConfigured.
+  ///
+  /// In pt, this message translates to:
+  /// **'O servidor ainda não tem as credenciais do Google (veja docs/YOUTUBE.md). Enquanto isso, a agenda funciona com lembretes.'**
+  String get youtubeNotConfigured;
+
+  /// No description provided for @youtubeConnect.
+  ///
+  /// In pt, this message translates to:
+  /// **'Conectar canal'**
+  String get youtubeConnect;
+
+  /// No description provided for @youtubeConnectHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Abre o login do Google no navegador. Depois volte ao app.'**
+  String get youtubeConnectHint;
+
+  /// No description provided for @youtubeDisconnect.
+  ///
+  /// In pt, this message translates to:
+  /// **'Desconectar'**
+  String get youtubeDisconnect;
+
+  /// No description provided for @youtubeConnected.
+  ///
+  /// In pt, this message translates to:
+  /// **'Conectado: {channel}'**
+  String youtubeConnected(String channel);
+
+  /// No description provided for @youtubeAuditPending.
+  ///
+  /// In pt, this message translates to:
+  /// **'Auditoria do Google pendente: envios pela API ficam privados. A agenda usa lembretes até a aprovação.'**
+  String get youtubeAuditPending;
+
+  /// No description provided for @youtubeAuto.
+  ///
+  /// In pt, this message translates to:
+  /// **'Publicação automática ativa: agendar já envia ao YouTube com o horário programado.'**
+  String get youtubeAuto;
+
+  /// No description provided for @slotsTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Horários de postagem'**
+  String get slotsTitle;
+
+  /// No description provided for @slotsHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Fuso do servidor: {tz}'**
+  String slotsHint(String tz);
+
+  /// No description provided for @addSlot.
+  ///
+  /// In pt, this message translates to:
+  /// **'Adicionar horário'**
+  String get addSlot;
+
+  /// No description provided for @remindersDenied.
+  ///
+  /// In pt, this message translates to:
+  /// **'Ative as notificações do app para receber os lembretes de postagem.'**
+  String get remindersDenied;
 }
 
 class _AppLocalizationsDelegate

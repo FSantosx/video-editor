@@ -50,13 +50,13 @@ def _safe(fn, *args):
         fn(*args)
     except Exception as exc:  # o job nunca derruba o servidor
         log.error("job %s%s falhou\n%s", fn.__name__, args, traceback.format_exc())
-        vid = args[0]
+        vid, message = args[0], str(exc)[-500:]
         try:
             if fn is analyze_video:
-                store.update_video(vid, status="error", error=str(exc)[-500:])
+                store.update_video(vid, status="error", error=message)
             else:
                 store.update_short(vid, args[1], lambda s: s["render"].update(
-                    status="error", error=str(exc)[-500:]))
+                    status="error", error=message))
         except KeyError:
             pass  # vídeo apagado no meio do processamento
 
@@ -158,6 +158,50 @@ def render(vid: str, sid: int) -> None:
                version=version + 1, seconds=round(time.time() - t0, 1))
     log.info("short %s/%s (%s) renderizado em %.1fs", vid, sid, short.get("format"),
              time.time() - t0)
+
+
+def submit_upload(item_id: str) -> None:
+    from .publish import queue
+    queue.update_item(item_id, status="uploading", error=None, progress=0.0)
+    _pool.submit(_safe_upload, item_id)
+
+
+def _safe_upload(item_id: str) -> None:
+    from .publish import queue
+    try:
+        upload_to_youtube(item_id)
+    except Exception as exc:
+        log.error("upload %s falhou\n%s", item_id, traceback.format_exc())
+        try:
+            queue.update_item(item_id, status="failed", error=str(exc)[-500:])
+        except KeyError:
+            pass
+
+
+def upload_to_youtube(item_id: str) -> None:
+    """Envia o corte ao YouTube. Com a API auditada, agenda a publicação (publishAt) no
+    horário do item; sem auditoria o YouTube força privado, então é só um envio de teste."""
+    from .publish import queue, youtube
+    item = queue.get_item(item_id)
+    short = store.get_short(item["video_id"], item["short_id"])
+    name = short["render"].get("file")
+    path = store.video_dir(item["video_id"]) / "shorts" / name if name else None
+    if path is None or not path.exists():
+        raise RuntimeError("o corte ainda não tem vídeo renderizado")
+    last = [0.0]
+
+    def on_progress(f):
+        if f - last[0] >= 0.1:
+            last[0] = f
+            queue.update_item(item_id, progress=round(f, 2))
+
+    publish_at = item["slot_at"] if config.YOUTUBE_AUDITED else None
+    yt_id = youtube.upload(path, item["title"], item["description"], item["tags"], publish_at,
+                           on_progress)
+    queue.update_item(item_id, status="uploaded", youtube_id=yt_id, progress=1.0,
+                      uploaded_at=time.time(), scheduled_on_youtube=bool(publish_at))
+    log.info("corte %s/%s enviado ao YouTube: %s (agendado=%s)", item["video_id"],
+             item["short_id"], yt_id, bool(publish_at))
 
 
 def _aspect(short: dict) -> float:

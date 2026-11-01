@@ -1,5 +1,4 @@
 """Abertura com teaser: escolha do momento, montagem e render."""
-import subprocess
 
 from app.pipeline.captions import build_ass
 from app.pipeline.edit import build_short, map_words_to_output, render_clips

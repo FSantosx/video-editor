@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/publish/presentation/agenda_page.dart';
+import '../features/publish/presentation/publish_item_page.dart';
+import '../features/publish/presentation/publish_settings_page.dart';
 import '../features/settings/presentation/settings_page.dart';
 import '../features/videos/presentation/short_editor_page.dart';
 import '../features/videos/presentation/video_detail_page.dart';
@@ -18,6 +21,17 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/', builder: (_, _) => const VideosListPage()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
+      GoRoute(
+        path: '/publish',
+        builder: (_, _) => const AgendaPage(),
+        routes: [
+          GoRoute(path: 'settings', builder: (_, _) => const PublishSettingsPage()),
+          GoRoute(
+            path: ':itemId',
+            builder: (_, state) => PublishItemPage(itemId: state.pathParameters['itemId']!),
+          ),
+        ],
+      ),
       GoRoute(
         path: '/videos/:id',
         builder: (_, state) => VideoDetailPage(videoId: state.pathParameters['id']!),

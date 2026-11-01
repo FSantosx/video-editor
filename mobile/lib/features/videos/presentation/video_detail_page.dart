@@ -6,6 +6,7 @@ import '../../../core/l10n.dart';
 import '../../../core/providers.dart';
 import '../../../core/result.dart';
 import '../../../core/widgets/error_view.dart';
+import '../../publish/presentation/publish_widgets.dart';
 import '../domain/models.dart';
 import 'widgets/short_card.dart';
 import 'widgets/status_label.dart';
@@ -25,6 +26,12 @@ class VideoDetailPage extends ConsumerWidget {
       appBar: AppBar(
         title: Text(video?.filename ?? l10n.shortsTitle),
         actions: [
+          if (video != null && video.status == VideoStatus.ready && video.shorts.isNotEmpty)
+            IconButton(
+              tooltip: l10n.scheduleAll,
+              icon: const Icon(Icons.event_available),
+              onPressed: () => scheduleShorts(context, ref, video.id),
+            ),
           if (video != null && video.status == VideoStatus.ready)
             IconButton(
               tooltip: l10n.reprocess,
