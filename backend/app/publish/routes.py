@@ -8,11 +8,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from .. import config, jobs, store
-from ..auth import require_key
+from ..accounts import current_user, owns
 from . import queue, youtube
 
 router = APIRouter()
-key = [Depends(require_key)]
+User = Depends(current_user)  # cada conta tem a própria agenda, horários e canal
 
 
 # ---------------------------------------------------------------- agenda
@@ -21,22 +21,23 @@ class SettingsPatch(BaseModel):
     slots: list[str] = Field(..., min_length=1, max_length=12)
 
 
-@router.get("/publish/settings", dependencies=key)
-def get_settings():
-    slots = queue.current_slots()
+@router.get("/publish/settings")
+def get_settings(user: dict = User):
+    owner = user["id"]
+    slots = queue.current_slots(owner)
     return {"slots": slots, "tz": config.PUBLISH_TZ, "hashtags": config.PUBLISH_HASHTAGS,
             "next_slots": [queue.iso(d) for d in
-                           queue.next_free_slots(3, queue.taken_slots(), slots)],
-            "youtube": youtube.status()}
+                           queue.next_free_slots(3, queue.taken_slots(owner), slots)],
+            "youtube": youtube.status(owner)}
 
 
-@router.put("/publish/settings", dependencies=key)
-def put_settings(body: SettingsPatch):
+@router.put("/publish/settings")
+def put_settings(body: SettingsPatch, user: dict = User):
     try:
-        queue.save_slots(body.slots)
+        queue.save_slots(body.slots, user["id"])
     except ValueError as exc:
         raise HTTPException(422, str(exc))
-    return get_settings()
+    return get_settings(user)
 
 
 # ---------------------------------------------------------------- fila
@@ -49,9 +50,9 @@ class ScheduleRequest(BaseModel):
     slot_at: str | None = None  # ISO com fuso; só para um corte
 
 
-@router.get("/publish/queue", dependencies=key)
-def get_queue(include_done: bool = False):
-    items = queue.list_items()
+@router.get("/publish/queue")
+def get_queue(include_done: bool = False, user: dict = User):
+    items = queue.list_items(user["id"])
     if not include_done:
         cutoff = time.time() - 3 * 24 * 3600  # postados nos últimos 3 dias continuam visíveis
         items = [i for i in items if i["status"] in queue.ACTIVE or i["status"] == "failed"
@@ -59,12 +60,14 @@ def get_queue(include_done: bool = False):
     return [queue.item_view(i) for i in items]
 
 
-@router.post("/publish/queue", status_code=201, dependencies=key)
-def add_to_queue(req: ScheduleRequest):
+@router.post("/publish/queue", status_code=201)
+def add_to_queue(req: ScheduleRequest, user: dict = User):
     try:
+        video = store.get_video(req.video_id)
         shorts = store.get_shorts(req.video_id)
-        store.get_video(req.video_id)
     except KeyError:
+        raise HTTPException(404, "vídeo não encontrado")
+    if not owns(user, video):
         raise HTTPException(404, "vídeo não encontrado")
     ids = req.short_ids
     if ids is None:
@@ -72,10 +75,10 @@ def add_to_queue(req: ScheduleRequest):
                and s["render"].get("status") == "done"]
         if not ids:
             raise HTTPException(422, f"nenhum corte {req.format} pronto neste vídeo")
-    auto_upload = youtube.status()["auto_upload"]
+    auto_upload = youtube.status(user["id"])["auto_upload"]
     try:
         items = queue.schedule(req.video_id, ids, "api" if auto_upload else "assisted",
-                               req.slot_at)
+                               req.slot_at, owner=user["id"])
     except KeyError as exc:
         raise HTTPException(404, str(exc).strip("'\""))
     except ValueError as exc:
@@ -93,9 +96,9 @@ class ItemPatch(BaseModel):
     status: Literal["scheduled", "posted", "skipped"] | None = None
 
 
-@router.patch("/publish/queue/{item_id}", dependencies=key)
-def patch_item(item_id: str, patch: ItemPatch):
-    item = _item_or_404(item_id)
+@router.patch("/publish/queue/{item_id}")
+def patch_item(item_id: str, patch: ItemPatch, user: dict = User):
+    item = _item_or_404(item_id, user)
     sent = item["status"] in ("uploading", "uploaded")
     if sent and (patch.slot_at or patch.title or patch.description):
         raise HTTPException(409, "já enviado ao YouTube: altere pelo YouTube Studio")
@@ -118,19 +121,19 @@ def patch_item(item_id: str, patch: ItemPatch):
     return queue.item_view(queue.update_item(item_id, **fields))
 
 
-@router.delete("/publish/queue/{item_id}", status_code=204, dependencies=key)
-def delete_item(item_id: str):
-    item = _item_or_404(item_id)
+@router.delete("/publish/queue/{item_id}", status_code=204)
+def delete_item(item_id: str, user: dict = User):
+    item = _item_or_404(item_id, user)
     if item["status"] == "uploading":
         raise HTTPException(409, "envio em andamento")
     queue.delete_item(item_id)
 
 
-@router.post("/publish/queue/{item_id}/upload", dependencies=key)
-def upload_item(item_id: str):
+@router.post("/publish/queue/{item_id}/upload")
+def upload_item(item_id: str, user: dict = User):
     """Envio manual. Sem auditoria o YouTube deixa o vídeo privado (serve para testar)."""
-    item = _item_or_404(item_id)
-    if not youtube.status()["connected"]:
+    item = _item_or_404(item_id, user)
+    if not youtube.status(user["id"])["connected"]:
         raise HTTPException(409, "conecte o canal do YouTube primeiro")
     if item["status"] in ("uploading", "uploaded"):
         raise HTTPException(409, "já enviado")
@@ -138,26 +141,26 @@ def upload_item(item_id: str):
     return queue.item_view(queue.get_item(item_id))
 
 
-def _item_or_404(item_id: str) -> dict:
+def _item_or_404(item_id: str, user: dict) -> dict:
     try:
-        return queue.get_item(item_id)
+        return queue.get_item(item_id, owner=user["id"])
     except KeyError:
         raise HTTPException(404, "item não encontrado na fila")
 
 
 # ---------------------------------------------------------------- YouTube
 
-@router.get("/youtube/status", dependencies=key)
-def yt_status():
-    return {**youtube.status(), "redirect_uri": youtube.redirect_uri()
+@router.get("/youtube/status")
+def yt_status(user: dict = User):
+    return {**youtube.status(user["id"]), "redirect_uri": youtube.redirect_uri()
             if config.PUBLIC_URL else None}
 
 
-@router.get("/youtube/connect", dependencies=key)
-def yt_connect(redirect: bool = False):
+@router.get("/youtube/connect")
+def yt_connect(redirect: bool = False, user: dict = User):
     """URL de login do Google. Com ?redirect=true redireciona direto (para abrir no navegador)."""
     try:
-        url = youtube.start_auth()
+        url = youtube.start_auth(user["id"])
     except youtube.YouTubeError as exc:
         raise HTTPException(409, str(exc))
     return RedirectResponse(url) if redirect else {"url": url}
@@ -178,9 +181,9 @@ def yt_callback(state: str = "", code: str = "", error: str = ""):
                  "Pode fechar esta página e voltar ao app.")
 
 
-@router.post("/youtube/disconnect", status_code=204, dependencies=key)
-def yt_disconnect():
-    youtube.disconnect()
+@router.post("/youtube/disconnect", status_code=204)
+def yt_disconnect(user: dict = User):
+    youtube.disconnect(user["id"])
 
 
 def _page(title: str, text: str) -> str:

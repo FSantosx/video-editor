@@ -21,6 +21,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import config, jobs, store
+from . import accounts
+from .accounts import current_user, require_admin
 from .auth import require_key
 from .publish.routes import router as publish_router
 from .pipeline import render, titles, transcribe
@@ -46,15 +48,19 @@ app = FastAPI(title="Video Editor - Shorts", version="0.1.0", lifespan=lifespan)
 
 
 
-def _video_or_404(vid: str) -> dict:
+def _video_or_404(vid: str, user: dict) -> dict:
+    """Vídeo da conta. Vídeo de outra conta responde 404, como se não existisse."""
     try:
-        return store.get_video(vid)
+        video = store.get_video(vid)
     except KeyError:
         raise HTTPException(404, "vídeo não encontrado")
+    if not accounts.owns(user, video):
+        raise HTTPException(404, "vídeo não encontrado")
+    return video
 
 
-def _short_or_404(vid: str, sid: int) -> dict:
-    _video_or_404(vid)
+def _short_or_404(vid: str, sid: int, user: dict) -> dict:
+    _video_or_404(vid, user)
     try:
         return store.get_short(vid, sid)
     except KeyError:
@@ -73,18 +79,18 @@ def _with_shorts(video: dict) -> dict:
     return {**video, "shorts": store.get_shorts(video["id"]), "outdated": outdated}
 
 
-@app.get("/videos", dependencies=[Depends(require_key)])
-def list_videos():
-    return [_with_shorts(v) for v in store.list_videos()]
+@app.get("/videos")
+def list_videos(user: dict = Depends(current_user)):
+    return [_with_shorts(v) for v in store.list_videos(owner=user["id"])]
 
 
-@app.post("/videos", status_code=201, dependencies=[Depends(require_key)])
-def upload_video(file: UploadFile = File(...)):
+@app.post("/videos", status_code=201)
+def upload_video(file: UploadFile = File(...), user: dict = Depends(current_user)):
     ext = Path(file.filename or "").suffix.lower() or ".mp4"
     if ext not in ALLOWED_EXT:
         raise HTTPException(415, f"formato não suportado: {ext}")
 
-    video = store.create_video(file.filename or f"video{ext}")
+    video = store.create_video(file.filename or f"video{ext}", owner=user["id"])
     dest = store.video_dir(video["id"]) / f"source{ext}"
     limit, written = config.MAX_UPLOAD_MB * 1024 * 1024, 0
     try:
@@ -102,33 +108,33 @@ def upload_video(file: UploadFile = File(...)):
     return store.get_video(video["id"])
 
 
-@app.get("/videos/{vid}", dependencies=[Depends(require_key)])
-def get_video(vid: str):
-    return _with_shorts(_video_or_404(vid))
+@app.get("/videos/{vid}")
+def get_video(vid: str, user: dict = Depends(current_user)):
+    return _with_shorts(_video_or_404(vid, user))
 
 
-@app.delete("/videos/{vid}", status_code=204, dependencies=[Depends(require_key)])
-def delete_video(vid: str):
-    _video_or_404(vid)
+@app.delete("/videos/{vid}", status_code=204)
+def delete_video(vid: str, user: dict = Depends(current_user)):
+    _video_or_404(vid, user)
     store.delete_video(vid)
 
 
-@app.get("/videos/{vid}/transcript", dependencies=[Depends(require_key)])
-def get_transcript(vid: str):
-    _video_or_404(vid)
+@app.get("/videos/{vid}/transcript")
+def get_transcript(vid: str, user: dict = Depends(current_user)):
+    _video_or_404(vid, user)
     analysis = store.get_analysis(vid)
     if analysis is None:
         raise HTTPException(409, "transcrição ainda não terminou")
     return {"language": analysis.get("language"), "words": analysis["words"]}
 
 
-@app.post("/videos/{vid}/reanalyze", dependencies=[Depends(require_key)])
-def reanalyze(vid: str):
+@app.post("/videos/{vid}/reanalyze")
+def reanalyze(vid: str, user: dict = Depends(current_user)):
     """Refaz a seleção e os cortes com a versão atual (sem transcrever de novo).
 
     Serve para aplicar novidades (teaser, gancho, zoom, loop...) a vídeos já processados.
     """
-    video = _video_or_404(vid)
+    video = _video_or_404(vid, user)
     if video["status"] in ("queued", "analyzing", "uploading"):
         raise HTTPException(409, "o vídeo ainda está sendo processado")
     jobs.submit_analysis(vid)
@@ -159,9 +165,9 @@ class ShortPatch(BaseModel):
     sync_group: bool = False
 
 
-@app.patch("/videos/{vid}/shorts/{sid}", dependencies=[Depends(require_key)])
-def patch_short(vid: str, sid: int, patch: ShortPatch):
-    short = _short_or_404(vid, sid)
+@app.patch("/videos/{vid}/shorts/{sid}")
+def patch_short(vid: str, sid: int, patch: ShortPatch, user: dict = Depends(current_user)):
+    short = _short_or_404(vid, sid, user)
     meta = store.get_video(vid)["meta"]
     analysis = store.get_analysis(vid)
     words, energy = analysis["words"], analysis.get("energy", [])
@@ -248,15 +254,15 @@ def patch_short(vid: str, sid: int, patch: ShortPatch):
     return store.get_short(vid, sid)
 
 
-@app.post("/videos/{vid}/shorts/{sid}/render", dependencies=[Depends(require_key)])
-def rerender(vid: str, sid: int):
-    _short_or_404(vid, sid)
+@app.post("/videos/{vid}/shorts/{sid}/render")
+def rerender(vid: str, sid: int, user: dict = Depends(current_user)):
+    _short_or_404(vid, sid, user)
     jobs.submit_render(vid, sid)
     return store.get_short(vid, sid)
 
 
-def _short_file(vid: str, sid: int, key: str, media_type: str) -> FileResponse:
-    short = _short_or_404(vid, sid)
+def _short_file(vid: str, sid: int, key: str, media_type: str, user: dict) -> FileResponse:
+    short = _short_or_404(vid, sid, user)
     name = short["render"].get(key)
     path = store.video_dir(vid) / "shorts" / name if name else None
     if path is None or not path.exists():
@@ -267,20 +273,20 @@ def _short_file(vid: str, sid: int, key: str, media_type: str) -> FileResponse:
     return FileResponse(path, media_type=media_type, filename=filename)
 
 
-@app.get("/videos/{vid}/shorts/{sid}/video", dependencies=[Depends(require_key)])
-def short_video(vid: str, sid: int):
-    return _short_file(vid, sid, "file", "video/mp4")
+@app.get("/videos/{vid}/shorts/{sid}/video")
+def short_video(vid: str, sid: int, user: dict = Depends(current_user)):
+    return _short_file(vid, sid, "file", "video/mp4", user)
 
 
-@app.get("/videos/{vid}/shorts/{sid}/thumb", dependencies=[Depends(require_key)])
-def short_thumb(vid: str, sid: int):
-    return _short_file(vid, sid, "thumb", "image/jpeg")
+@app.get("/videos/{vid}/shorts/{sid}/thumb")
+def short_thumb(vid: str, sid: int, user: dict = Depends(current_user)):
+    return _short_file(vid, sid, "thumb", "image/jpeg", user)
 
 
-@app.get("/stats", dependencies=[Depends(require_key)])
-def stats():
+@app.get("/stats")
+def stats(user: dict = Depends(current_user)):
     usage = shutil.disk_usage(config.DATA_DIR)
-    return {"videos": len(store.list_videos()),
+    return {"videos": len(store.list_videos(owner=user["id"])),
             "disk_free_gb": round(usage.free / 1e9, 2),
             "whisper_model": config.WHISPER_MODEL}
 
@@ -304,17 +310,62 @@ def system():
     }
 
 
-@app.post("/videos/{vid}/open-folder", status_code=204, dependencies=[Depends(require_key)])
-def open_folder(vid: str):
+@app.post("/videos/{vid}/open-folder", status_code=204)
+def open_folder(vid: str, user: dict = Depends(current_user)):
     """Só no modo desktop: abre a pasta dos shorts no Explorer."""
     if not config.DESKTOP_MODE:
         raise HTTPException(404)
-    _video_or_404(vid)
+    _video_or_404(vid, user)
     folder = store.video_dir(vid) / "shorts"
     if sys.platform == "win32":
         os.startfile(folder)  # noqa: S606 - caminho controlado pelo servidor
     else:
         subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(folder)])
+
+
+# ---------------------------------------------------------------- contas
+
+class NewUser(BaseModel):
+    name: str = Field(..., min_length=1, max_length=60)
+
+
+@app.get("/me")
+def me(user: dict = Depends(current_user)):
+    return {**user, "multi_user": bool(config.API_KEY)}
+
+
+@app.get("/admin/users", dependencies=[Depends(require_admin)])
+def admin_list_users():
+    return [{k: v for k, v in u.items() if k != "token_hash"} for u in accounts.list_users()]
+
+
+@app.post("/admin/users", status_code=201, dependencies=[Depends(require_admin)])
+def admin_create_user(body: NewUser):
+    """Cria uma conta e devolve a chave dela (mostrada só agora)."""
+    if not config.API_KEY:
+        raise HTTPException(409, "contas exigem API_KEY no servidor (no PC, é uma pessoa só)")
+    try:
+        user, token = accounts.create_user(body.name)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+    return {"user": user, "token": token}
+
+
+@app.post("/admin/users/{user_id}/token", dependencies=[Depends(require_admin)])
+def admin_rotate_token(user_id: str):
+    """Gera uma chave nova para a conta (a antiga para de funcionar)."""
+    try:
+        return {"token": accounts.rotate_token(user_id)}
+    except KeyError:
+        raise HTTPException(404, "conta não encontrada")
+
+
+@app.delete("/admin/users/{user_id}", status_code=204, dependencies=[Depends(require_admin)])
+def admin_delete_user(user_id: str, purge: bool = False):
+    try:
+        accounts.delete_user(user_id, purge=purge)
+    except KeyError:
+        raise HTTPException(404, "conta não encontrada")
 
 
 app.include_router(publish_router)

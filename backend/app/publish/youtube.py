@@ -1,8 +1,8 @@
 """Integração com a API do YouTube: login (OAuth 2.0) e upload com publicação programada.
 
 Fluxo de login: /youtube/connect devolve a URL do Google; o usuário autoriza e o Google
-volta em /youtube/callback, que troca o código pelo token (guardado em DATA_DIR, com o
-refresh token para não precisar logar de novo).
+volta em /youtube/callback, que troca o código pelo token (guardado na pasta da conta,
+com o refresh token para não precisar logar de novo). Cada conta tem o próprio canal.
 
 Atenção: projetos da API não auditados pelo Google só conseguem enviar vídeos PRIVADOS,
 e o publishAt não tem efeito. Por isso o envio automático só acontece com
@@ -14,6 +14,7 @@ import secrets
 import time
 
 from .. import config
+from ..accounts import PRINCIPAL_ID, user_dir, user_file
 
 log = logging.getLogger("youtube")
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload",
@@ -33,8 +34,17 @@ def redirect_uri() -> str:
     return f"{config.PUBLIC_URL}/youtube/callback"
 
 
-def _token_path():
-    return config.DATA_DIR / "youtube_token.json"
+def _token_path(owner: str):
+    return user_file(owner, "youtube_token.json")
+
+
+def _channel_path(owner: str):
+    return user_file(owner, "youtube_channel.json")
+
+
+def _own_path(owner: str, name: str):
+    """Onde gravar: sempre na pasta da conta (o legado da raiz só é lido)."""
+    return user_dir(owner) / name
 
 
 def _states_path():
@@ -60,7 +70,7 @@ def _flow(state: str | None = None):
 
 # ---------------------------------------------------------------- login
 
-def start_auth() -> str:
+def start_auth(owner: str = PRINCIPAL_ID) -> str:
     """URL de autorização do Google. Guarda state + code_verifier (PKCE) para o retorno."""
     if not configured():
         raise YouTubeError("defina GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e PUBLIC_URL")
@@ -71,7 +81,8 @@ def start_auth() -> str:
     states = _read_json(_states_path(), {})
     now = time.time()
     states = {k: v for k, v in states.items() if now - v["at"] < STATE_TTL_S}
-    states[state] = {"at": now, "verifier": getattr(flow, "code_verifier", None)}
+    states[state] = {"at": now, "verifier": getattr(flow, "code_verifier", None),
+                     "owner": owner}
     _write_json(_states_path(), states)
     return url
 
@@ -90,54 +101,56 @@ def finish_auth(state: str, code: str) -> dict:
     if not creds.refresh_token:
         raise YouTubeError("o Google não devolveu o refresh token; remova o acesso do app "
                            "em myaccount.google.com/permissions e conecte de novo")
-    _write_json(_token_path(), json.loads(creds.to_json()))
-    info = channel_info(force=True)
-    log.info("YouTube conectado: %s", info.get("title"))
+    owner = pending.get("owner", PRINCIPAL_ID)
+    _write_json(_own_path(owner, "youtube_token.json"), json.loads(creds.to_json()))
+    info = channel_info(owner, force=True)
+    log.info("YouTube conectado (%s): %s", owner, info.get("title"))
     return info
 
 
-def disconnect() -> None:
-    for p in (_token_path(), config.DATA_DIR / "youtube_channel.json"):
-        p.unlink(missing_ok=True)
+def disconnect(owner: str = PRINCIPAL_ID) -> None:
+    for name in ("youtube_token.json", "youtube_channel.json"):
+        _own_path(owner, name).unlink(missing_ok=True)
+        if owner == PRINCIPAL_ID:  # arquivos de antes das contas
+            (config.DATA_DIR / name).unlink(missing_ok=True)
 
 
-def _credentials():
+def _credentials(owner: str):
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
 
-    data = _read_json(_token_path(), None)
+    data = _read_json(_token_path(owner), None)
     if not data:
         raise YouTubeError("YouTube não conectado")
     creds = Credentials.from_authorized_user_info(data, SCOPES)
     if not creds.valid:
         creds.refresh(Request())
-        _write_json(_token_path(), json.loads(creds.to_json()))
+        _write_json(_own_path(owner, "youtube_token.json"), json.loads(creds.to_json()))
     return creds
 
 
-def _service():
+def _service(owner: str):
     from googleapiclient.discovery import build
 
-    return build("youtube", "v3", credentials=_credentials(), cache_discovery=False)
+    return build("youtube", "v3", credentials=_credentials(owner), cache_discovery=False)
 
 
-def channel_info(force: bool = False) -> dict:
-    cache = config.DATA_DIR / "youtube_channel.json"
-    if not force and (cached := _read_json(cache, None)):
+def channel_info(owner: str = PRINCIPAL_ID, force: bool = False) -> dict:
+    if not force and (cached := _read_json(_channel_path(owner), None)):
         return cached
-    resp = _service().channels().list(part="snippet", mine=True).execute()
+    resp = _service(owner).channels().list(part="snippet", mine=True).execute()
     items = resp.get("items") or []
     info = {"id": items[0]["id"], "title": items[0]["snippet"]["title"]} if items else {}
-    _write_json(cache, info)
+    _write_json(_own_path(owner, "youtube_channel.json"), info)
     return info
 
 
-def status() -> dict:
-    connected = _token_path().exists()
+def status(owner: str = PRINCIPAL_ID) -> dict:
+    connected = _token_path(owner).exists()
     channel = None
     if connected:
         try:
-            channel = channel_info()
+            channel = channel_info(owner)
         except Exception as exc:  # token revogado etc.: mostra como desconectado
             log.warning("falha ao ler o canal: %s", exc)
             connected = False
@@ -148,7 +161,7 @@ def status() -> dict:
 
 # ---------------------------------------------------------------- upload
 
-def upload(path, title: str, description: str, tags: list[str], publish_at: str | None,
+def upload(owner: str, path, title: str, description: str, tags: list[str], publish_at: str | None,
            on_progress=None) -> str:
     """Envia o MP4. Com publish_at, fica privado até o horário e o YouTube publica sozinho.
 
@@ -168,7 +181,7 @@ def upload(path, title: str, description: str, tags: list[str], publish_at: str 
     media = MediaFileUpload(str(path), mimetype="video/mp4", chunksize=8 * 1024 * 1024,
                             resumable=True)
     try:
-        request = _service().videos().insert(part="snippet,status", body=body,
+        request = _service(owner).videos().insert(part="snippet,status", body=body,
                                              media_body=media)
         response = None
         while response is None:
@@ -198,5 +211,5 @@ def _read_json(path, default):
 def _write_json(path, data) -> None:
     from .. import store
 
-    config.DATA_DIR.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
     store._write(path, data)

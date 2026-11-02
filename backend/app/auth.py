@@ -1,14 +1,9 @@
-"""API key (header X-API-Key ou ?key=) compartilhada pelas rotas."""
-import secrets
+"""Autenticação das rotas: a chave (header X-API-Key ou ?key=) identifica a conta."""
+from fastapi import Request
 
-from fastapi import HTTPException, Request
-
-from . import config
+from .accounts import current_user
 
 
 def require_key(request: Request) -> None:
-    if not config.API_KEY:
-        return
-    key = request.headers.get("x-api-key") or request.query_params.get("key") or ""
-    if not secrets.compare_digest(key, config.API_KEY):
-        raise HTTPException(401, "API key inválida")
+    """Para rotas que não dependem da conta (ex.: /system): só exige uma chave válida."""
+    current_user(request)

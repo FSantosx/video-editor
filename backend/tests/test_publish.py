@@ -5,6 +5,7 @@ import subprocess
 import time
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -174,7 +175,7 @@ class FakeService:
 @pytest.fixture()
 def connected(client, monkeypatch):
     service = FakeService()
-    monkeypatch.setattr(client.youtube, "_service", lambda: service)
+    monkeypatch.setattr(client.youtube, "_service", lambda owner: service)
     token = config.DATA_DIR / "youtube_token.json"
     token.write_text(json.dumps({"refresh_token": "r", "client_id": "c", "client_secret": "s",
                                  "token": "t"}))
@@ -203,7 +204,7 @@ def test_connect_url_and_callback(client, monkeypatch):
             flows.append((code, self.code_verifier))
 
     monkeypatch.setattr(client.youtube, "_flow", lambda state=None: FakeFlow())
-    monkeypatch.setattr(client.youtube, "_service", lambda: FakeService())
+    monkeypatch.setattr(client.youtube, "_service", lambda owner: FakeService())
     page = client.get(f"/youtube/callback?state={state}&code=abc").text
     assert "Meu Canal" in page and flows and flows[0][0] == "abc"
     st = client.get("/youtube/status").json()
@@ -247,3 +248,79 @@ def test_upload_quota_error_is_readable(client, connected, monkeypatch):
     client.post(f"/publish/queue/{item['id']}/upload")
     failed = wait_item(client, item["id"], {"failed"})
     assert "limite diário" in failed["error"]
+
+
+# ---------------------------------------------------------------- contas
+
+def test_accounts_isolate_videos_queue_and_channel(client, connected):
+    # o administrador (API_KEY) cria a conta da segunda pessoa
+    created = client.post("/admin/users", json={"name": "Celular 2"})
+    assert created.status_code == 201, created.text
+    other = {"X-API-Key": created.json()["token"]}
+    uid = created.json()["user"]["id"]
+    assert "token_hash" not in created.json()["user"]
+    assert client.get("/me", headers=other).json()["name"] == "Celular 2"
+    assert client.post("/admin/users", json={"name": "celular 2"}).status_code == 409
+
+    # vídeos: a conta nova não vê nem mexe nos vídeos da principal
+    assert client.get("/videos", headers=other).json() == []
+    assert client.get(f"/videos/{client.vid}", headers=other).status_code == 404
+    sid = client.shorts[0]["id"]
+    assert client.get(f"/videos/{client.vid}/shorts/{sid}/video",
+                      headers=other).status_code == 404
+    assert client.delete(f"/videos/{client.vid}", headers=other).status_code == 404
+    assert client.post("/publish/queue", headers=other,
+                       json={"video_id": client.vid}).status_code == 404
+
+    # agenda: cada um vê só a sua; o mesmo horário pode ser usado pelos dois canais
+    mine = client.post("/publish/queue", json={"video_id": client.vid,
+                                               "short_ids": [sid]}).json()[0]
+    assert client.get("/publish/queue", headers=other).json() == []
+    assert client.patch(f"/publish/queue/{mine['id']}", headers=other,
+                        json={"status": "posted"}).status_code == 404
+    assert client.put("/publish/settings", headers=other,
+                      json={"slots": ["09:00"]}).status_code == 200
+    assert client.get("/publish/settings").json()["slots"] != ["09:00"]
+
+    # canal: a principal está conectada, a conta nova não
+    assert client.get("/youtube/status").json()["connected"] is True
+    assert client.get("/youtube/status", headers=other).json()["connected"] is False
+
+    # só o administrador gerencia contas
+    assert client.get("/admin/users", headers=other).status_code == 403
+    assert [u["id"] for u in client.get("/admin/users").json()] == [uid]
+
+    # nova chave invalida a antiga; apagar a conta tira o acesso
+    new_token = client.post(f"/admin/users/{uid}/token").json()["token"]
+    assert client.get("/videos", headers=other).status_code == 401
+    assert client.get("/videos", headers={"X-API-Key": new_token}).status_code == 200
+    assert client.delete(f"/admin/users/{uid}?purge=true").status_code == 204
+    assert client.get("/videos", headers={"X-API-Key": new_token}).status_code == 401
+    assert client.get("/publish/queue").json()[0]["id"] == mine["id"]
+
+
+def test_each_account_connects_its_own_channel(client, monkeypatch):
+    token = client.post("/admin/users", json={"name": "Desktop"}).json()["token"]
+    other = {"X-API-Key": token}
+    url = client.get("/youtube/connect", headers=other).json()["url"]
+    state = parse_qs(urlparse(url).query)["state"][0]
+
+    class Creds:
+        refresh_token = "r"
+
+        def to_json(self):
+            return json.dumps({"refresh_token": "r", "client_id": "c", "client_secret": "s",
+                               "token": "t"})
+
+    class FakeFlow:
+        credentials = Creds()
+        code_verifier = None
+
+        def fetch_token(self, code):
+            pass
+
+    monkeypatch.setattr(client.youtube, "_flow", lambda state=None: FakeFlow())
+    monkeypatch.setattr(client.youtube, "_service", lambda owner: FakeService())
+    assert "conectado" in client.get(f"/youtube/callback?state={state}&code=abc").text
+    assert client.get("/youtube/status", headers=other).json()["connected"] is True
+    assert client.get("/youtube/status").json()["connected"] is False

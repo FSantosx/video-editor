@@ -18,6 +18,7 @@ from datetime import datetime, time as dtime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from .. import config, store
+from ..accounts import PRINCIPAL_ID, user_dir, user_file
 
 _lock = threading.RLock()
 ACTIVE = ("scheduled", "uploading", "uploaded")
@@ -41,13 +42,19 @@ def _save(items: list[dict]) -> None:
     store._write(_path(), items)
 
 
-def list_items() -> list[dict]:
-    return sorted(_load(), key=lambda i: i["slot_at"])
+def _owner(item: dict) -> str:
+    return item.get("owner", PRINCIPAL_ID)  # itens de antes das contas: principal
 
 
-def get_item(item_id: str) -> dict:
+def list_items(owner: str | None = None) -> list[dict]:
+    items = [i for i in _load() if owner is None or _owner(i) == owner]
+    return sorted(items, key=lambda i: i["slot_at"])
+
+
+def get_item(item_id: str, owner: str | None = None) -> dict:
+    """Item da fila; com owner, item de outra conta conta como inexistente."""
     for i in _load():
-        if i["id"] == item_id:
+        if i["id"] == item_id and (owner is None or _owner(i) == owner):
             return i
     raise KeyError(item_id)
 
@@ -72,22 +79,24 @@ def delete_item(item_id: str) -> None:
         _save(kept)
 
 
+def delete_owner_items(owner: str) -> None:
+    with _lock:
+        _save([i for i in _load() if _owner(i) != owner])
+
+
 # ---------------------------------------------------------------- horários
 
-def _settings_path():
-    return config.DATA_DIR / "publish_settings.json"
-
-
-def current_slots() -> list[str]:
-    """Horários salvos pelo app (ou os padrões de PUBLISH_SLOTS)."""
-    saved = store._read(_settings_path(), {}) or {}
+def current_slots(owner: str = PRINCIPAL_ID) -> list[str]:
+    """Horários salvos pela conta (ou os padrões de PUBLISH_SLOTS)."""
+    saved = store._read(user_file(owner, "publish_settings.json"), {}) or {}
     return saved.get("slots") or list(config.PUBLISH_SLOTS)
 
 
-def save_slots(slots: list[str]) -> list[str]:
+def save_slots(slots: list[str], owner: str = PRINCIPAL_ID) -> list[str]:
     normalized = [t.strftime("%H:%M") for t in parse_slots(slots)]
-    config.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    store._write(_settings_path(), {"slots": normalized})
+    path = user_dir(owner) / "publish_settings.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    store._write(path, {"slots": normalized})
     return normalized
 
 
@@ -108,7 +117,7 @@ def next_free_slots(n: int, taken: set[str], slots: list[str] | None = None,
                     ) -> list[datetime]:
     """Próximos n horários livres (UTC), a partir de agora + min_lead, no fuso da agenda."""
     tz = ZoneInfo(config.PUBLISH_TZ)
-    times = parse_slots(slots or current_slots())
+    times = parse_slots(slots or list(config.PUBLISH_SLOTS))
     now = now or datetime.now(timezone.utc)
     earliest = now + min_lead
     day = earliest.astimezone(tz).date()
@@ -164,7 +173,7 @@ def build_metadata(short: dict, video: dict) -> dict:
 # ---------------------------------------------------------------- fila
 
 def schedule(video_id: str, short_ids: list[int], mode: str,
-             slot_at: str | None = None) -> list[dict]:
+             slot_at: str | None = None, owner: str = PRINCIPAL_ID) -> list[dict]:
     """Coloca cortes na fila, cada um no próximo horário livre (ou no slot_at informado)."""
     video = store.get_video(video_id)
     shorts = {s["id"]: s for s in store.get_shorts(video_id)}
@@ -177,11 +186,12 @@ def schedule(video_id: str, short_ids: list[int], mode: str,
 
     with _lock:
         items = _load()
-        already = {(i["video_id"], i["short_id"]) for i in items if i["status"] in ACTIVE}
+        mine = [i for i in items if _owner(i) == owner]
+        already = {(i["video_id"], i["short_id"]) for i in mine if i["status"] in ACTIVE}
         dupes = [sid for sid in short_ids if (video_id, sid) in already]
         if dupes:
             raise ValueError(f"cortes já estão na fila: {dupes}")
-        taken = {i["slot_at"] for i in items if i["status"] in ACTIVE}
+        taken = {i["slot_at"] for i in mine if i["status"] in ACTIVE}
         if slot_at:
             if len(short_ids) != 1:
                 raise ValueError("horário específico só para um corte por vez")
@@ -190,13 +200,14 @@ def schedule(video_id: str, short_ids: list[int], mode: str,
                 raise ValueError("o horário precisa estar no futuro")
             slots = [when]
         else:
-            slots = next_free_slots(len(short_ids), taken)
+            slots = next_free_slots(len(short_ids), taken, current_slots(owner))
 
         new = []
         for sid, when in zip(short_ids, slots):
             meta = build_metadata(shorts[sid], video)
             new.append({
-                "id": uuid.uuid4().hex[:12], "video_id": video_id, "short_id": sid,
+                "id": uuid.uuid4().hex[:12], "owner": owner, "video_id": video_id,
+                "short_id": sid,
                 "format": shorts[sid].get("format", "9:16"), "slot_at": iso(when),
                 **meta, "status": "scheduled", "mode": mode, "youtube_id": None,
                 "error": None, "created_at": time.time(), "posted_at": None,
@@ -205,8 +216,8 @@ def schedule(video_id: str, short_ids: list[int], mode: str,
         return new
 
 
-def taken_slots() -> set[str]:
-    return {i["slot_at"] for i in _load() if i["status"] in ACTIVE}
+def taken_slots(owner: str = PRINCIPAL_ID) -> set[str]:
+    return {i["slot_at"] for i in _load() if i["status"] in ACTIVE and _owner(i) == owner}
 
 
 def item_view(item: dict) -> dict:

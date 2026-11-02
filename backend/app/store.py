@@ -69,11 +69,11 @@ def _write(path: Path, data) -> None:
         _retry(lambda: os.replace(tmp, path))  # atômico: nunca deixa JSON pela metade
 
 
-def create_video(filename: str) -> dict:
+def create_video(filename: str, owner: str = "principal") -> dict:
     vid = new_id()
     d = video_dir(vid)
     (d / "shorts").mkdir(parents=True)
-    video = {"id": vid, "filename": filename, "created_at": time.time(),
+    video = {"id": vid, "owner": owner, "filename": filename, "created_at": time.time(),
              "status": "uploading", "step": None, "progress": 0.0, "error": None,
              "meta": None, "language": None}
     _write(d / "video.json", video)
@@ -96,10 +96,13 @@ def update_video(vid: str, **fields) -> dict:
         return video
 
 
-def list_videos() -> list[dict]:
+def list_videos(owner: str | None = None) -> list[dict]:
+    """Vídeos (de uma conta, se owner for dado; os antigos sem owner são da principal)."""
     if not config.VIDEOS_DIR.exists():
         return []
     videos = [v for d in config.VIDEOS_DIR.iterdir() if (v := _read(d / "video.json"))]
+    if owner is not None:
+        videos = [v for v in videos if v.get("owner", "principal") == owner]
     return sorted(videos, key=lambda v: v["created_at"], reverse=True)
 
 

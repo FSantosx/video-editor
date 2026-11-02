@@ -196,8 +196,8 @@ def upload_to_youtube(item_id: str) -> None:
             queue.update_item(item_id, progress=round(f, 2))
 
     publish_at = item["slot_at"] if config.YOUTUBE_AUDITED else None
-    yt_id = youtube.upload(path, item["title"], item["description"], item["tags"], publish_at,
-                           on_progress)
+    yt_id = youtube.upload(item.get("owner", "principal"), path, item["title"],
+                           item["description"], item["tags"], publish_at, on_progress)
     queue.update_item(item_id, status="uploaded", youtube_id=yt_id, progress=1.0,
                       uploaded_at=time.time(), scheduled_on_youtube=bool(publish_at))
     log.info("corte %s/%s enviado ao YouTube: %s (agendado=%s)", item["video_id"],
